@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <!-- Aquí se carga el componente principal DE MOMENTO-->
+    <!-- Aquí se carga el componente principal DE MOMENTO -->
     <XestionUsuarios />
   </div>
 </template>
@@ -10,27 +10,27 @@ import XestionUsuarios from './components/XestionUsuarios.vue'
 </script>
 
 <style>
-/* 👇 Estilos globales mínimos */
-:global(body) {
-  margin: 0;               /* quita el margen por defecto del body */
-  background: #f6f6f6;     /* color de fondo general */
-}
+/* ============================================================
+   ESTILOS DE LA APP (componente raíz)
+   ============================================================
+   Este bloque NO lleva "scoped": está pensado únicamente para
+   el contenedor #app, que es el marco general de la aplicación.
 
+   Nota: #app es el mismo <div> que se define en index.html y
+   donde main.js monta la aplicación.
+   ------------------------------------------------------------
+   Todo lo demás (colores, tipografía y fondo del body) ya está
+   centralizado en src/style.css, que se importa en main.js.
+   ============================================================ */
+
+/* Contenedor principal: centrado, con un ancho máximo del 80%
+   de la pantalla y ocupando todo el alto como mínimo. */
 #app {
-  max-width: 80vw;
-  margin: 0 auto;          /* centra horizontalmente */
-  padding-top: 1rem;       /* 🔹 margen superior pequeño */
-  padding-bottom: 1rem;    /* 🔹 espacio para el futuro footer */
-  min-height: 100vh;       /* ocupa toda la altura de la pantalla */
+  max-width: 80vw;           /* ancho máximo de la aplicación */
+  min-height: 100vh;         /* la app ocupa al menos todo el alto */
+  margin: 0 auto;            /* centra el contenedor horizontalmente */
+  padding: 1rem 0;           /* respiro arriba y abajo (prepara futuro footer) */
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* el contenido empieza arriba */
 }
-/* Cuando la pantalla es menor a 768px */
-@media (max-width: 768px) {
-  .container {
-    flex-direction: column;
-  }
-}
-
 </style>
