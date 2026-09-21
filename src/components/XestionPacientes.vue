@@ -196,61 +196,70 @@
     <h4>📋 Listaxe de usuarios</h4>
 
     <!-- La tabla solo se muestra si hay usuarios guardados;
-         en caso contrario se muestra el párrafo v-else. -->
-    <table v-if="usuarios.length > 0">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>DNI/CIF</th>
-          <th>Nome</th>
-          <th>Correo</th>
-          <th>Provincia</th>
-          <th>Activo</th>
-          <th>Tipo de conta</th>
-          <th>Accións</th>
-        </tr>
-      </thead>
+         en caso contrario se muestra el párrafo v-else.
 
-      <tbody>
-        <tr
-          v-for="(u, index) in usuarios"
-          :key="index"
-        >
-          <td class="centrado">
-            {{ index + 1 }}
-          </td>
-          <td class="centrado">
-            {{ u.dni }}
-          </td>
-          <td>{{ u.nome }}</td>
-          <td>{{ u.correo }}</td>
-          <td>{{ u.provincia }}</td>
-          <td class="centrado">
-            {{ u.activo ? "✅" : "❌" }}
-          </td>
-          <td>{{ u.tipoCuenta }}</td>
+         La tabla va envuelta en .tabla-wrapper: si no cabe en
+         horizontal, aparece un scroll DENTRO de la tarjeta en vez
+         de desbordar el contenido por el lado derecho. -->
+    <div
+      v-if="usuarios.length > 0"
+      class="tabla-wrapper"
+    >
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>DNI/CIF</th>
+            <th>Nome</th>
+            <th>Correo</th>
+            <th>Provincia</th>
+            <th>Activo</th>
+            <th>Tipo de conta</th>
+            <th>Accións</th>
+          </tr>
+        </thead>
 
-          <!-- Botones de acción: editar y eliminar el usuario. -->
-          <td class="centrado">
-            <button
-              class="btn-accion"
-              title="Editar"
-              @click="editarUsuario(index)"
-            >
-              ✏️
-            </button>
+        <tbody>
+          <tr
+            v-for="(u, index) in usuarios"
+            :key="index"
+          >
+            <td class="centrado">
+              {{ index + 1 }}
+            </td>
+            <td class="centrado">
+              {{ u.dni }}
+            </td>
+            <td>{{ u.nome }}</td>
+            <td>{{ u.correo }}</td>
+            <td>{{ u.provincia }}</td>
+            <td class="centrado">
+              {{ u.activo ? "✅" : "❌" }}
+            </td>
+            <td>{{ u.tipoCuenta }}</td>
 
-            <button
-              class="btn-accion"
-              title="Eliminar"
-              @click="eliminarUsuario(index)"
-            >
-              🗑️
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <!-- Botones de acción: editar y eliminar el usuario. -->
+            <td class="centrado">
+              <button
+                class="btn-accion"
+                title="Editar"
+                @click="editarUsuario(index)"
+              >
+                ✏️
+              </button>
+
+              <button
+                class="btn-accion"
+                title="Eliminar"
+                @click="eliminarUsuario(index)"
+              >
+                🗑️
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <p v-else>
       Non hai usuarios cargados.
@@ -459,6 +468,10 @@ function hayError(campo) {
    ------------------------------------------------------------ */
 .xestion-usuarios {
   width: 100%;
+  /* min-width: 0 → al ser la tarjeta hija directa de #app (flex en
+     columna), sin esto no podría encogerse por debajo del ancho
+     natural de su contenido y empujaría todo hacia la derecha. */
+  min-width: 0;
   background-color: var(--color-tarjeta); /* fondo blanco de la tarjeta */
   padding: 2rem;                          /* hueco interior alrededor de todo */
   border-radius: 8px;                     /* esquinas suavizadas */
@@ -492,11 +505,18 @@ form {
 }
 
 /* Un campo = label + control, alineados en horizontal.
-   El label tiene un ancho fijo para que los inputs queden alineados. */
+   El label tiene un ancho fijo para que los inputs queden alineados.
+
+   min-width: 0 → por defecto los item de flex tienen
+   "min-width: auto", que impide encoger por debajo del ancho
+   natural del input (~170px). Eso hacía que, en ventanas medianas,
+   las filas de 3 campos no cupieran y todo se saliera por la
+   derecha. Con min-width: 0 el campo puede estrecharse. */
 .campo {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 /* Ancho relativo de cada campo. La suma de los "flex" de una fila
@@ -521,10 +541,14 @@ form {
   font-weight: 500;
 }
 
-/* Inputs y select del formulario: mismo aspecto para todos. */
+/* Inputs y select del formulario: mismo aspecto para todos.
+   min-width: 0 → permite que el input se estreche cuando la fila
+   no tiene espacio (si no, el ancho natural del input ~170px forzaba
+   el desborde en ventanas medianas). */
 .campo input,
 .campo select {
   flex: 1;
+  min-width: 0;
   padding: 0.5rem;
   border: 1px solid var(--color-borde);
   border-radius: 4px;
@@ -546,6 +570,7 @@ form {
    cambia y los campos vecinos no se mueven ni se descentran. */
 .campo-control {
   flex: 1;
+  min-width: 0; /* igual que .campo: permite encoger (evita desbordes) */
   display: flex;
   flex-direction: column;
   justify-content: center; /* centra el contenido en el alto reservado */
@@ -603,6 +628,14 @@ form {
 /* ------------------------------------------------------------
    3. LISTA DE USUARIOS (tabla)
    ------------------------------------------------------------ */
+/* Contenedor de la tabla: si la tabla no cabe en horizontal
+   (p.ej. en ventanas medianas), aparece una barra de scroll
+   DENTRO de la tarjeta en lugar de desbordar el contenido
+   por el lado derecho de la pantalla. */
+.tabla-wrapper {
+  overflow-x: auto;
+}
+
 table {
   width: 100%;
   border-collapse: collapse; /* une los bordes de las celdas (sin doble línea) */
