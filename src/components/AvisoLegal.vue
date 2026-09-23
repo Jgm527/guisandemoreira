@@ -1,11 +1,7 @@
 <template>
-    <h2>Aviso Legal</h2>
+  <h2>Aviso Legal</h2>
 </template>
 
-<script setup>
+<script setup></script>
 
-</script>
-
-<style scoped>
-
-</style>
+<style scoped></style>
