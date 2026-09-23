@@ -31,12 +31,9 @@
               type="text"
               required
               @blur="sanitizarDni"
-            >
+            />
 
-            <span
-              v-if="hayError('dni')"
-              class="mensaxe-erro"
-            >
+            <span v-if="hayError('dni')" class="mensaxe-erro">
               DNI/NIE inválido
             </span>
           </div>
@@ -51,7 +48,7 @@
             type="text"
             required
             @blur="sanitizarNome"
-          >
+          />
         </div>
 
         <div class="campo campo-apellidos">
@@ -63,7 +60,7 @@
             type="text"
             required
             @blur="sanitizarApellidos"
-          >
+          />
         </div>
       </div>
 
@@ -75,7 +72,7 @@
             :class="{ incorrecto: hayError('fecha') }"
             type="date"
             required
-          >
+          />
         </div>
 
         <div class="campo campo-correo">
@@ -85,7 +82,7 @@
             :class="{ incorrecto: hayError('correo') }"
             type="email"
             required
-          >
+          />
         </div>
 
         <!-- NOTA: este campo estaba antes anidado dentro del campo
@@ -104,12 +101,9 @@
               type="tel"
               required
               @blur="sanitizarMobil"
-            >
+            />
 
-            <span
-              v-if="hayError('mobil')"
-              class="mensaxe-erro"
-            >
+            <span v-if="hayError('mobil')" class="mensaxe-erro">
               Debe comezar por 6 ou 7
             </span>
           </div>
@@ -124,7 +118,7 @@
             :class="{ incorrecto: hayError('direccion') }"
             type="text"
             required
-          >
+          />
         </div>
 
         <div class="campo campo-provincia">
@@ -132,18 +126,39 @@
 
           <select
             v-model="novoUsuario.provincia"
-            :class="{ incorrecto: hayError('provincia') }"
+            :class="{ incorrecto: hayError('localidad') }"
+            @change="cargarMunicipios"
           >
-            <option value="">
-              -- Escolle unha provincia --
-            </option>
+            <option value="">-- Escolle unha provincia --</option>
             <option
-            v-for="provincia in provincias"
-            :key = "provincia.id"
-            :value = "provincia.nome"
-            >{{ provincia.nome }}</option>
+              v-for="provincia in provincias"
+              :key="provincia.id"
+              :value="provincia.id"
+            >
+              {{ provincia.nm }}
+            </option>
           </select>
         </div>
+
+        <div class="campo campo-provincia">
+          <label>Municipio:</label>
+
+          <select
+          id="municipio"
+            v-model="novoUsuario.municipio"
+            :class="{ incorrecto: hayError('localidad') }"
+          >
+            <option value="">-- Escolle un municipio --</option>
+            <option
+              v-for="municipio in municipios"
+              :key="municipio.id"
+              :value="municipio.id"
+            >
+              {{ municipio.nm }}
+            </option>
+          </select>
+        </div>
+
       </div>
 
       <div class="fila fila-centrada">
@@ -151,10 +166,7 @@
           <label>Activo:</label>
 
           <div class="inline-control">
-            <input
-              v-model="novoUsuario.activo"
-              type="checkbox"
-            >
+            <input v-model="novoUsuario.activo" type="checkbox" />
             <span>Activo</span>
           </div>
         </div>
@@ -168,7 +180,7 @@
                 v-model="novoUsuario.tipoCuenta"
                 type="radio"
                 value="particular"
-              >
+              />
               <span>Particular</span>
             </label>
 
@@ -177,7 +189,7 @@
                 v-model="novoUsuario.tipoCuenta"
                 type="radio"
                 value="empresa"
-              >
+              />
               <span>Empresa</span>
             </label>
           </div>
@@ -201,10 +213,7 @@
          La tabla va envuelta en .tabla-wrapper: si no cabe en
          horizontal, aparece un scroll DENTRO de la tarjeta en vez
          de desbordar el contenido por el lado derecho. -->
-    <div
-      v-if="usuarios.length > 0"
-      class="tabla-wrapper"
-    >
+    <div v-if="usuarios.length > 0" class="tabla-wrapper">
       <table>
         <thead>
           <tr>
@@ -220,10 +229,7 @@
         </thead>
 
         <tbody>
-          <tr
-            v-for="(u, index) in usuarios"
-            :key="index"
-          >
+          <tr v-for="(u, index) in usuarios" :key="index">
             <td class="centrado">
               {{ index + 1 }}
             </td>
@@ -261,9 +267,7 @@
       </table>
     </div>
 
-    <p v-else>
-      Non hai usuarios cargados.
-    </p>
+    <p v-else>Non hai usuarios cargados.</p>
   </div>
 </template>
 
@@ -271,6 +275,7 @@
 /// Zona de declaracións
 
 import { ref, reactive, onMounted } from "vue";
+import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
 
 const usuarios = ref([]);
 
@@ -286,8 +291,9 @@ const novoUsuario = reactive({
 /// Zona de ciclo de vida
 
 const provincias = ref([])
+const municipios = ref([])
 
-onMounted(() => {
+onMounted(async () => {
   usuarios.value = [
     {
       dni: "A000000C",
@@ -322,14 +328,16 @@ onMounted(() => {
       tipoCuenta: "empresa",
     },
   ];
-
-  provincias.value = [
-    {id: 1, nome: "A Coruña"},
-    {id: 2, nome: "Pontevedra"},
-    {id: 3, nome: "Lugo"},
-    {id: 4, nome: "Ourense"}
-  ]
+  provincias.value = await obtenerProvincias();
 });
+
+async function cargarMunicipios() {
+  if (novoUsuario.provincia === "") {
+    municipios.value = []
+    return;
+  }
+  municipios.value = await obtenerMunicipios(novoUsuario.provincia)
+}
 
 /// Zona de métodos ou funcións
 
@@ -430,7 +438,7 @@ function hayError(campo) {
     return novoUsuario.correo === "";
   }
 
-  if (campo === "provincia") {
+  if (campo === "localidad") {
     return novoUsuario.provincia === "";
   }
 
@@ -473,8 +481,8 @@ function hayError(campo) {
      natural de su contenido y empujaría todo hacia la derecha. */
   min-width: 0;
   background-color: var(--color-tarjeta); /* fondo blanco de la tarjeta */
-  padding: 2rem;                          /* hueco interior alrededor de todo */
-  border-radius: 8px;                     /* esquinas suavizadas */
+  padding: 2rem; /* hueco interior alrededor de todo */
+  border-radius: 8px; /* esquinas suavizadas */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* sombra ligera para destacar */
   box-sizing: border-box;
 }
@@ -488,15 +496,15 @@ form {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;               /* espacio entre filas del formulario */
-  margin-bottom: 2rem;     /* separación entre el formulario y la tabla */
+  gap: 1rem; /* espacio entre filas del formulario */
+  margin-bottom: 2rem; /* separación entre el formulario y la tabla */
 }
 
 /* Cada fila reparte sus campos en horizontal con flexbox. */
 .fila {
   display: flex;
   width: 100%;
-  gap: 1rem;               /* separación entre los campos de una fila */
+  gap: 1rem; /* separación entre los campos de una fila */
 }
 
 /* Fila centrada: se usa para los campos "Activo" y "Tipo de conta". */
@@ -524,14 +532,30 @@ form {
    - flex: 2 → el doble de ancho que un flex: 1.
    Se le da más ancho al DNI, Correo y Dirección porque sus labels
    son más largos y, en el caso del DNI, debe caber el error debajo. */
-.campo-dni { flex: 2; }
-.campo-nome { flex: 1; }
-.campo-apellidos { flex: 1; }
-.campo-fecha { flex: 1; }
-.campo-correo { flex: 2; }
-.campo-mobil { flex: 1; }
-.campo-direccion { flex: 2; }
-.campo-provincia { flex: 1; }
+.campo-dni {
+  flex: 2;
+}
+.campo-nome {
+  flex: 1;
+}
+.campo-apellidos {
+  flex: 1;
+}
+.campo-fecha {
+  flex: 1;
+}
+.campo-correo {
+  flex: 2;
+}
+.campo-mobil {
+  flex: 1;
+}
+.campo-direccion {
+  flex: 2;
+}
+.campo-provincia {
+  flex: 1;
+}
 
 /* Solo el label DIRECTO del campo (>.label) recibe ancho fijo.
    Así los labels de los radios, que están más anidados, no se ven
@@ -575,7 +599,7 @@ form {
   flex-direction: column;
   justify-content: center; /* centra el contenido en el alto reservado */
   gap: 0.25rem;
-  min-height: 3.6rem;      /* altura con el hueco del error ya reservado */
+  min-height: 3.6rem; /* altura con el hueco del error ya reservado */
 }
 
 /* Mensaje de error que se muestra bajo el campo con error. */
@@ -608,7 +632,7 @@ form {
 /* Botón principal "Gardar": verde, centrado debajo del formulario. */
 .btn-guardar {
   display: block;
-  margin: 0 auto;          /* lo centra horizontalmente */
+  margin: 0 auto; /* lo centra horizontalmente */
   padding: 0.6rem 1.5rem;
   border: none;
   border-radius: 4px;
@@ -622,7 +646,7 @@ form {
 /* Efecto al pasar el ratón: verde un poco más oscuro para dar
    señal visual de que el botón es clicable. */
 .btn-guardar:hover {
-  background-color: #1aa126;
+  background-color: #1b4965;
 }
 
 /* ------------------------------------------------------------
@@ -647,7 +671,7 @@ th,
 td {
   padding: 0.7rem;
   border: 1px solid var(--color-borde);
-  text-align: left;             /* el texto de las celdas queda a la izquierda */
+  text-align: left; /* el texto de las celdas queda a la izquierda */
 }
 
 /* Cabecera de la tabla: fondo gris claro y texto centrado. */
@@ -685,8 +709,8 @@ tbody tr:hover {
 /* Encabezados "Xestión de usuarios" y "Listaxe de usuarios",
    con un fondo verde para que destaquen como título de sección. */
 h4 {
-  margin-bottom: 1rem;            /* separación entre el título y lo que sigue */
-  padding: 0.5rem 0.75rem;        /* hueco interior para que el fondo no quede pegado */
+  margin-bottom: 1rem; /* separación entre el título y lo que sigue */
+  padding: 0.5rem 0.75rem; /* hueco interior para que el fondo no quede pegado */
   border-radius: 4px;
   background-color: var(--color-primario);
   color: white;

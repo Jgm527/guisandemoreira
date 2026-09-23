@@ -17,7 +17,7 @@
    se actualizarán en toda la aplicación.
    ------------------------------------------------------------ */
 :root {
-  --color-primario: #21c52f;   /* verde: botón guardar y títulos */
+  --color-primario: #1b4965;   /* verde: botón guardar y títulos */
   --color-error: #e3342f;      /* rojo: mensajes de error */
   --color-fondo: #f6f6f6;      /* fondo general de la página */
   --color-tarjeta: #ffffff;    /* fondo de los contenedores blancos */
