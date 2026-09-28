@@ -144,7 +144,7 @@
           <label>Municipio:</label>
 
           <select
-          id="municipio"
+            id="municipio"
             v-model="novoUsuario.municipio"
             :class="{ incorrecto: hayError('localidad') }"
           >
@@ -158,7 +158,6 @@
             </option>
           </select>
         </div>
-
       </div>
 
       <div class="fila fila-centrada">
@@ -290,8 +289,8 @@ const novoUsuario = reactive({
 
 /// Zona de ciclo de vida
 
-const provincias = ref([])
-const municipios = ref([])
+const provincias = ref([]);
+const municipios = ref([]);
 
 onMounted(async () => {
   usuarios.value = [
@@ -333,10 +332,10 @@ onMounted(async () => {
 
 async function cargarMunicipios() {
   if (novoUsuario.provincia === "") {
-    municipios.value = []
+    municipios.value = [];
     return;
   }
-  municipios.value = await obtenerMunicipios(novoUsuario.provincia)
+  municipios.value = await obtenerMunicipios(novoUsuario.provincia);
 }
 
 /// Zona de métodos ou funcións
