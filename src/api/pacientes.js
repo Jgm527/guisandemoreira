@@ -10,6 +10,6 @@ export async function guardarPaciente(formData) {
 }
 
 export async function obtenerPaciente() {
-    const res = await axios.get(API_ARL)
+    const res = await axios.get(API_URL)
     return res.data;
 }
