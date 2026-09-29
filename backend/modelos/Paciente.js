@@ -1,4 +1,4 @@
-import mongoose, { Collection } from "mongoose";
+import mongoose from "mongoose";
 
 const PacienteSchema = new mongoose.Schema(
   {
@@ -11,6 +11,8 @@ const PacienteSchema = new mongoose.Schema(
     dirpac: { type: String, required: true },
     propac: { type: String, required: true },
     munipac: { type: String, required: true },
+    activo: { type: Boolean, default: true },
+    tipoCuenta: { type: String, enum: ["particular", "empresa"], default: "particular" },
   },
   {
     Collection: "pacientes",
