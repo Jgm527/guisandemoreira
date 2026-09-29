@@ -1,12 +1,12 @@
 <template>
-  <div class="xestion-usuarios">
-    <h4>👥 Xestión de usuarios</h4>
+  <div class="xestion-pacientes">
+    <h4>👥 Xestión de pacientes</h4>
 
     <!-- ============================================================
-         FORMULARIO DE ALTA DE USUARIO
+         FORMULARIO DE ALTA DE PACIENTE
          ============================================================
          @submit.prevent evita que el navegador recargue la página
-         al enviar el formulario; llamamos a gardarUsuario().
+         al enviar el formulario; llamamos a guardarPaciente().
          Cada campo se agrupa en una .fila (una línea horizontal)
          y dentro de un .campo (label + input).
 
@@ -16,7 +16,7 @@
          - Nome      → primera letra de cada palabra en mayúscula.
          - Apellidos → igual que Nome.
          - Móbil     → se quitan los espacios (debe empezar por 6 o 7). -->
-    <form @submit.prevent="gardarUsuario">
+    <form @submit.prevent="guardarPaciente">
       <div class="fila">
         <div class="campo campo-dni">
           <label>DNI/CIF:</label>
@@ -25,7 +25,7 @@
                debajo el mensaje de error cuando es inválido. -->
           <div class="campo-control">
             <input
-              v-model="novoUsuario.dni"
+              v-model="novoPaciente.dnipac"
               :class="{ incorrecto: hayError('dni') }"
               class="centrado"
               type="text"
@@ -43,7 +43,7 @@
           <label>Nome:</label>
 
           <input
-            v-model="novoUsuario.nome"
+            v-model="novoPaciente.nompac"
             :class="{ incorrecto: hayError('nome') }"
             type="text"
             required
@@ -55,7 +55,7 @@
           <label>Apellido:</label>
 
           <input
-            v-model="novoUsuario.apellidos"
+            v-model="novoPaciente.apelpac"
             :class="{ incorrecto: hayError('apellidos') }"
             type="text"
             required
@@ -68,7 +68,7 @@
         <div class="campo campo-fecha">
           <label>Fecha:</label>
           <input
-            v-model="novoUsuario.fecha"
+            v-model="novoPaciente.nacipac"
             :class="{ incorrecto: hayError('fecha') }"
             type="date"
             required
@@ -78,7 +78,7 @@
         <div class="campo campo-correo">
           <label>Correo:</label>
           <input
-            v-model="novoUsuario.correo"
+            v-model="novoPaciente.mailpac"
             :class="{ incorrecto: hayError('correo') }"
             type="email"
             required
@@ -96,7 +96,7 @@
 
           <div class="campo-control">
             <input
-              v-model="novoUsuario.mobil"
+              v-model="novoPaciente.movilpac"
               :class="{ incorrecto: hayError('mobil') }"
               type="tel"
               required
@@ -114,7 +114,7 @@
         <div class="campo campo-direccion">
           <label>Dirección:</label>
           <input
-            v-model="novoUsuario.direccion"
+            v-model="novoPaciente.dirpac"
             :class="{ incorrecto: hayError('direccion') }"
             type="text"
             required
@@ -125,8 +125,9 @@
           <label>Provincia:</label>
 
           <select
-            v-model="novoUsuario.provincia"
+            v-model="novoPaciente.propac"
             :class="{ incorrecto: hayError('localidad') }"
+            required
             @change="cargarMunicipios"
           >
             <option value="">-- Escolle unha provincia --</option>
@@ -145,8 +146,9 @@
 
           <select
             id="municipio"
-            v-model="novoUsuario.municipio"
+            v-model="novoPaciente.munipac"
             :class="{ incorrecto: hayError('localidad') }"
+            required
           >
             <option value="">-- Escolle un municipio --</option>
             <option
@@ -165,7 +167,7 @@
           <label>Activo:</label>
 
           <div class="inline-control">
-            <input v-model="novoUsuario.activo" type="checkbox" />
+            <input v-model="novoPaciente.activo" type="checkbox" />
             <span>Activo</span>
           </div>
         </div>
@@ -176,7 +178,7 @@
           <div class="inline-control radios">
             <label>
               <input
-                v-model="novoUsuario.tipoCuenta"
+                v-model="novoPaciente.tipoCuenta"
                 type="radio"
                 value="particular"
               />
@@ -185,7 +187,7 @@
 
             <label>
               <input
-                v-model="novoUsuario.tipoCuenta"
+                v-model="novoPaciente.tipoCuenta"
                 type="radio"
                 value="empresa"
               />
@@ -198,21 +200,21 @@
       <button
         type="submit"
         class="btn-guardar"
-        :disabled="novoUsuario.dni === '' || novoUsuario.nome === ''"
+        :disabled="novoPaciente.dnipac === '' || novoPaciente.nompac === ''"
       >
         Gardar
       </button>
     </form>
 
-    <h4>📋 Listaxe de usuarios</h4>
+    <h4>📋 Listaxe de pacientes</h4>
 
-    <!-- La tabla solo se muestra si hay usuarios guardados;
+    <!-- La tabla solo se muestra si hay pacientes guardados;
          en caso contrario se muestra el párrafo v-else.
 
          La tabla va envuelta en .tabla-wrapper: si no cabe en
          horizontal, aparece un scroll DENTRO de la tarjeta en vez
          de desbordar el contenido por el lado derecho. -->
-    <div v-if="usuarios.length > 0" class="tabla-wrapper">
+    <div v-if="pacientes.length > 0" class="tabla-wrapper">
       <table>
         <thead>
           <tr>
@@ -228,27 +230,27 @@
         </thead>
 
         <tbody>
-          <tr v-for="(u, index) in usuarios" :key="index">
+          <tr v-for="(u, index) in pacientes" :key="index">
             <td class="centrado">
               {{ index + 1 }}
             </td>
             <td class="centrado">
-              {{ u.dni }}
+              {{ u.dnipac }}
             </td>
-            <td>{{ u.nome }}</td>
-            <td>{{ u.correo }}</td>
-            <td>{{ u.provincia }}</td>
+            <td>{{ u.nompac }}</td>
+            <td>{{ u.mailpac }}</td>
+            <td>{{ u.propac }}</td>
             <td class="centrado">
               {{ u.activo ? "✅" : "❌" }}
             </td>
             <td>{{ u.tipoCuenta }}</td>
 
-            <!-- Botones de acción: editar y eliminar el usuario. -->
+            <!-- Botones de acción: editar y eliminar el paciente. -->
             <td class="centrado">
               <button
                 class="btn-accion"
                 title="Editar"
-                @click="editarUsuario(index)"
+                @click="editarPaciente(index)"
               >
                 ✏️
               </button>
@@ -256,7 +258,7 @@
               <button
                 class="btn-accion"
                 title="Eliminar"
-                @click="eliminarUsuario(index)"
+                @click="eliminarPaciente(index)"
               >
                 🗑️
               </button>
@@ -266,7 +268,7 @@
       </table>
     </div>
 
-    <p v-else>Non hai usuarios cargados.</p>
+    <p v-else>Non hai pacientes cargados.</p>
   </div>
 </template>
 
@@ -275,16 +277,22 @@
 
 import { ref, reactive, onMounted } from "vue";
 import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
+import { getPacientes, savePaciente } from "../api/pacientes.js";
 
-const usuarios = ref([]);
+const pacientes = ref([]);
 
-const novoUsuario = reactive({
-  dni: "",
-  nome: "",
-  correo: "",
-  provincia: "",
-  activo: false,
-  tipoCuenta: "",
+const novoPaciente = reactive({
+  nompac: "",
+  dnipac: "",
+  apelpac: "",
+  nacipac: "",
+  mailpac: "",
+  movilpac: "",
+  dirpac: "",
+  propac: "",
+  munipac: "",
+  activo: true,
+  tipoCuenta: "particular"
 });
 
 /// Zona de ciclo de vida
@@ -293,74 +301,56 @@ const provincias = ref([]);
 const municipios = ref([]);
 
 onMounted(async () => {
-  usuarios.value = [
-    {
-      dni: "A000000C",
-      nome: "Soldaduras SL",
-      correo: "soldadura@email.com",
-      provincia: "A Coruña",
-      activo: true,
-      tipoCuenta: "empresa",
-    },
-    {
-      dni: "0000000C",
-      nome: "María Pérez",
-      correo: "maria@email.com",
-      provincia: "Lugo",
-      activo: false,
-      tipoCuenta: "particular",
-    },
-    {
-      dni: "B1234567D",
-      nome: "Xosé López",
-      correo: "xose@email.com",
-      provincia: "Ourense",
-      activo: true,
-      tipoCuenta: "particular",
-    },
-    {
-      dni: "C9876543E",
-      nome: "Construcións Modernas",
-      correo: "construcion@email.com",
-      provincia: "Pontevedra",
-      activo: true,
-      tipoCuenta: "empresa",
-    },
-  ];
+  pacientes.value = await getPacientes();
   provincias.value = await obtenerProvincias();
 });
 
 async function cargarMunicipios() {
-  if (novoUsuario.provincia === "") {
+  if (novoPaciente.propac === "") {
     municipios.value = [];
     return;
   }
-  municipios.value = await obtenerMunicipios(novoUsuario.provincia);
+  municipios.value = await obtenerMunicipios(novoPaciente.propac);
 }
 
 /// Zona de métodos ou funcións
 
-function gardarUsuario() {
-  usuarios.value.push({ ...novoUsuario });
+async function guardarPaciente() {
+  try {
+        //tomar el nombre del municipio seleccionado y asignarlo a novoPaciente.munipac
+        //y de la provincia seleccionado y asignarlo a novoPaciente.propac
+        const provincia = provincias.value.find(
+              p => p.id === novoPaciente.propac
+          );
 
-  Object.assign(novoUsuario, {
-    dni: "",
-    nome: "",
-    correo: "",
-    provincia: "",
-    activo: false,
-    tipoCuenta: "",
-  });
+          const municipio = municipios.value.find(
+            m => m.id === novoPaciente.munipac
+          );
+
+          if (!provincia || !municipio) return;
+
+  			const pacienteGuardado = await savePaciente({
+            ...novoPaciente,
+            propac: provincia.nm,
+            munipac: municipio.nm
+          });
+    		pacientes.value.push(pacienteGuardado);
+    		console.log("Paciente gardado correctamente");
+        // getPacientes(); // Actualiza la lista de pacientes después de guardar
+  } catch (error) {
+    console.error("Error ao gardar paciente:", error);
+  }
 }
 
-function eliminarUsuario(index) {
-  usuarios.value.splice(index, 1);
+
+function eliminarPaciente(index) {
+  pacientes.value.splice(index, 1);
 }
 
-function editarUsuario(index) {
-  const usuario = usuarios.value[index];
+function editarPaciente(index) {
+  const paciente = pacientes.value[index];
 
-  Object.assign(novoUsuario, usuario);
+  Object.assign(novoPaciente, paciente);
 }
 
 /// Zona de sanitización (limpieza) de campos
@@ -368,7 +358,7 @@ function editarUsuario(index) {
 // DNI: al SALIR del campo, quita los espacios y pasa la letra
 // final a mayúscula de forma automática.
 function sanitizarDni() {
-  novoUsuario.dni = novoUsuario.dni.trim().toUpperCase();
+  novoPaciente.dnipac = novoPaciente.dnipac.trim().toUpperCase();
 }
 
 // Nome / Apellidos: al SALIR del campo, deja la primera letra de
@@ -382,17 +372,17 @@ function capitalizarNome(texto) {
 }
 
 function sanitizarNome() {
-  novoUsuario.nome = capitalizarNome(novoUsuario.nome);
+  novoPaciente.nompac = capitalizarNome(novoPaciente.nompac);
 }
 
 function sanitizarApellidos() {
-  novoUsuario.apellidos = capitalizarNome(novoUsuario.apellidos);
+  novoPaciente.apelpac = capitalizarNome(novoPaciente.apelpac);
 }
 
 // Móbil: al SALIR del campo, quita los espacios para que la
 // validación "empieza por 6 o 7" sea correcta.
 function sanitizarMobil() {
-  novoUsuario.mobil = novoUsuario.mobil.replace(/\s+/g, "");
+  novoPaciente.movilpac = novoPaciente.movilpac.replace(/\s+/g, "");
 }
 
 /// Funciones auxiliares
@@ -401,7 +391,7 @@ function esDniCorrecto() {
   // Comprobamos que tenga 8 números y una letra mayúscula
   const regex = /^\d{8}[A-Z]$/;
 
-  if (!regex.test(novoUsuario.dni)) {
+  if (!regex.test(novoPaciente.dnipac)) {
     return false;
   }
 
@@ -409,7 +399,7 @@ function esDniCorrecto() {
   const letras = "TRWAGMYFPDXBNJZSQVHLCKE";
 
   // Cogemos solamente los 8 números
-  const numero = parseInt(novoUsuario.dni.substring(0, 8));
+  const numero = parseInt(novoPaciente.dnipac.substring(0, 8));
 
   // Calculamos el resto de dividir entre 23
   const resto = numero % 23;
@@ -419,31 +409,31 @@ function esDniCorrecto() {
   const letraCorrecta = letras[resto];
 
   // Comparamos la letra calculada con la del DNI
-  const letraDni = novoUsuario.dni.charAt(8);
+  const letraDni = novoPaciente.dnipac.charAt(8);
 
   return letraDni === letraCorrecta;
 }
 
 function hayError(campo) {
   if (campo === "dni") {
-    return novoUsuario.dni !== "" && !esDniCorrecto();
+    return novoPaciente.dnipac !== "" && !esDniCorrecto();
   }
 
   if (campo === "nome") {
-    return novoUsuario.nome === "";
+    return novoPaciente.nompac === "";
   }
 
   if (campo === "correo") {
-    return novoUsuario.correo === "";
+    return novoPaciente.mailpac === "";
   }
 
   if (campo === "localidad") {
-    return novoUsuario.provincia === "";
+    return novoPaciente.propac === "";
   }
 
   // El móbil es válido solo si no está vacío y empieza por 6 o 7.
   if (campo === "mobil") {
-    return novoUsuario.mobil !== "" && !/^[67]/.test(novoUsuario.mobil);
+    return novoPaciente.movilpac !== "" && !/^[67]/.test(novoPaciente.movilpac);
   }
 
   return false;
@@ -452,7 +442,7 @@ function hayError(campo) {
 
 <style scoped>
 /* ============================================================
-   ESTILOS DE XestionUsuarios.vue
+  ESTILOS DE XestionPacientes.vue
    ============================================================
    Bloque "scoped": estos estilos solo se aplican a este componente
    (Vue añade un atributo único a las clases para que no interfieran
@@ -462,9 +452,9 @@ function hayError(campo) {
    aquí mediante variables (var(--color-...)).
 
    Estructura del bloque:
-     1. Contenedor general (.xestion-usuarios)
+    1. Contenedor general (.xestion-pacientes)
      2. Formulario: filas, campos, inputs, errores y botón
-     3. Lista de usuarios (tabla)
+    3. Lista de pacientes (tabla)
      4. Títulos (h4)
      5. Responsive (pantallas pequeñas)
    ============================================================ */
@@ -473,7 +463,7 @@ function hayError(campo) {
    1. CONTENEDOR GENERAL
    La tarjeta blanca que envuelve todo el contenido del componente.
    ------------------------------------------------------------ */
-.xestion-usuarios {
+.xestion-pacientes {
   width: 100%;
   /* min-width: 0 → al ser la tarjeta hija directa de #app (flex en
      columna), sin esto no podría encogerse por debajo del ancho
@@ -649,7 +639,7 @@ form {
 }
 
 /* ------------------------------------------------------------
-   3. LISTA DE USUARIOS (tabla)
+  3. LISTA DE PACIENTES (tabla)
    ------------------------------------------------------------ */
 /* Contenedor de la tabla: si la tabla no cabe en horizontal
    (p.ej. en ventanas medianas), aparece una barra de scroll
@@ -681,7 +671,7 @@ th {
 }
 
 /* Resalta la fila al pasar el ratón para que sea más fácil
-   leer la lista de usuarios. */
+  leer la lista de pacientes. */
 tbody tr:hover {
   background-color: #f8f9fa;
 }
@@ -705,7 +695,7 @@ tbody tr:hover {
 /* ------------------------------------------------------------
    4. TÍTULOS (h4)
    ------------------------------------------------------------ */
-/* Encabezados "Xestión de usuarios" y "Listaxe de usuarios",
+/* Encabezados "Xestión de pacientes" y "Listaxe de pacientes",
    con un fondo verde para que destaquen como título de sección. */
 h4 {
   margin-bottom: 1rem; /* separación entre el título y lo que sigue */
@@ -722,7 +712,7 @@ h4 {
    vertical para que no se hagan demasiado estrechos.
    ------------------------------------------------------------ */
 @media (max-width: 768px) {
-  .xestion-usuarios {
+  .xestion-pacientes {
     padding: 1rem;
   }
 

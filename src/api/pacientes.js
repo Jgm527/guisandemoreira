@@ -1,15 +1,13 @@
 import axios from "axios"
 
-export async function guardarPaciente(formData) {
-    const res = await axios.post(API_URL, formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        }
-    });
+const API_URL = "http://localhost:3000/api";
+
+export async function getPacientes() {
+    const res = await axios.get(`${API_URL}/pacientes`)
     return res.data
 }
 
-export async function obtenerPaciente() {
-    const res = await axios.get(API_URL)
-    return res.data;
+export async function savePaciente(paciente) {
+    const res = await axios.post(`${API_URL}/pacientes`, paciente)
+    return res.data
 }
