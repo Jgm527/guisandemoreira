@@ -212,7 +212,7 @@
 
 import { ref, reactive, onMounted } from "vue";
 import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
-import { getPacientes, savePaciente } from "../api/pacientes.js";
+import { getPacientes, savePaciente, deletePaciente } from "../api/pacientes.js";
 
 const pacientes = ref([]);
 const dniInput = ref(null);
@@ -279,9 +279,15 @@ async function guardarPaciente() {
   }
 }
 
-
-function eliminarPaciente(index) {
-  pacientes.value.splice(index, 1);
+async function eliminarPaciente(index) {
+  try {
+    await deletePaciente(pacientes.value[index].dnipac);
+    pacientes.value.splice(index, 1);
+    console.log("Paciente eliminado correctamente");
+    getPacientes(); // Actualiza la lista de pacientes después de eliminar
+  } catch (error) {
+    console.error("Error ao eliminar paciente:", error);
+  }
 }
 
 function editarPaciente(index) {

@@ -12,3 +12,8 @@ export async function savePaciente(paciente) {
     const res = await axios.post(`${API_URL}/pacientes`, paciente)
     return res.data
 }
+
+export async function deletePaciente(dni) {
+    const res = await axios.delete(`${API_URL}/pacientes/${dni}`)
+    return res.data
+}

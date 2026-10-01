@@ -47,4 +47,16 @@ router.post("/", async (req, res) => {
     }
 })
 
+router.delete("/:dni", async (req, res) => {
+    try {
+        const paciente = await Paciente.findOneAndDelete({ dnipac: req.params.dni });
+        if (!paciente) {
+            return res.status(404).json({ mensaje: "Paciente no encontrado" });
+        }
+        res.json({ mensaje: "Paciente eliminado" });
+    } catch (error) {
+        res.status(500).json({ mensaje: "Error al eliminar el paciente", error });
+    }
+});
+
 export default router;
