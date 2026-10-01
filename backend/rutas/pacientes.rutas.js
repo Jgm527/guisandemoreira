@@ -5,8 +5,11 @@ const router = express.Router()
 
 router.get("/", async (req, res) => {
     try {
-        const pacientes = await Paciente.find()
-        res.json(pacientes)
+        const pacientes = await Paciente.find().lean()
+        res.json(pacientes.map(({ nompac, ...paciente }) => ({
+            ...paciente,
+            nomepac: paciente.nomepac ?? nompac
+        })))
     } catch (error) {
         res.status(500).json({ mensaje: ("Error al listar los pacientes", error)})
     }
