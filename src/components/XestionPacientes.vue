@@ -21,22 +21,17 @@
         <div class="campo campo-dni">
           <label>DNI/CIF:</label>
 
-          <!-- El DNI tiene su propio contenedor para poder mostrar
-               debajo el mensaje de error cuando es inválido. -->
-          <div class="campo-control">
-            <input
-              v-model="novoPaciente.dnipac"
-              :class="{ incorrecto: hayError('dni') }"
-              class="centrado"
-              type="text"
-              required
-              @blur="sanitizarDni"
-            />
-
-            <span v-if="hayError('dni')" class="mensaxe-erro">
-              DNI/NIE inválido
-            </span>
-          </div>
+          <input
+            ref="dniInput"
+            v-model="novoPaciente.dnipac"
+            :class="{ incorrecto: hayError('dni') || errorDniServidor }"
+            class="centrado"
+            type="text"
+            pattern="[0-9]{8}[A-Za-z]"
+            required
+            @input="errorDniServidor = false"
+            @blur="sanitizarDni"
+          />
         </div>
 
         <div class="campo campo-nome">
@@ -44,7 +39,6 @@
 
           <input
             v-model="novoPaciente.nompac"
-            :class="{ incorrecto: hayError('nome') }"
             type="text"
             required
             @blur="sanitizarNome"
@@ -56,7 +50,6 @@
 
           <input
             v-model="novoPaciente.apelpac"
-            :class="{ incorrecto: hayError('apellidos') }"
             type="text"
             required
             @blur="sanitizarApellidos"
@@ -69,7 +62,6 @@
           <label>Fecha:</label>
           <input
             v-model="novoPaciente.nacipac"
-            :class="{ incorrecto: hayError('fecha') }"
             type="date"
             required
           />
@@ -79,34 +71,20 @@
           <label>Correo:</label>
           <input
             v-model="novoPaciente.mailpac"
-            :class="{ incorrecto: hayError('correo') }"
             type="email"
             required
           />
         </div>
 
-        <!-- NOTA: este campo estaba antes anidado dentro del campo
-             Correo, lo que rompía la maquetación. Lo movimos aquí,
-             como hermano, para que los tres campos de la fila
-             queden alineados. El tipo correcto para teléfono es "tel".
-             Usa el mismo contenedor .campo-control que el DNI para
-             mostrar debajo el aviso de validación. -->
         <div class="campo campo-mobil">
           <label>Móbil:</label>
-
-          <div class="campo-control">
-            <input
-              v-model="novoPaciente.movilpac"
-              :class="{ incorrecto: hayError('mobil') }"
-              type="tel"
-              required
-              @blur="sanitizarMobil"
-            />
-
-            <span v-if="hayError('mobil')" class="mensaxe-erro">
-              Debe comezar por 6 ou 7
-            </span>
-          </div>
+          <input
+            v-model="novoPaciente.movilpac"
+            type="tel"
+            pattern="[67][0-9]{8}"
+            required
+            @blur="sanitizarMobil"
+          />
         </div>
       </div>
 
@@ -115,7 +93,6 @@
           <label>Dirección:</label>
           <input
             v-model="novoPaciente.dirpac"
-            :class="{ incorrecto: hayError('direccion') }"
             type="text"
             required
           />
@@ -126,7 +103,6 @@
 
           <select
             v-model="novoPaciente.propac"
-            :class="{ incorrecto: hayError('localidad') }"
             required
             @change="cargarMunicipios"
           >
@@ -147,7 +123,6 @@
           <select
             id="municipio"
             v-model="novoPaciente.munipac"
-            :class="{ incorrecto: hayError('localidad') }"
             required
           >
             <option value="">-- Escolle un municipio --</option>
@@ -162,45 +137,9 @@
         </div>
       </div>
 
-      <div class="fila fila-centrada">
-        <div class="campo inline-activo">
-          <label>Activo:</label>
-
-          <div class="inline-control">
-            <input v-model="novoPaciente.activo" type="checkbox" />
-            <span>Activo</span>
-          </div>
-        </div>
-
-        <div class="campo inline-cuenta">
-          <label>Tipo de conta:</label>
-
-          <div class="inline-control radios">
-            <label>
-              <input
-                v-model="novoPaciente.tipoCuenta"
-                type="radio"
-                value="particular"
-              />
-              <span>Particular</span>
-            </label>
-
-            <label>
-              <input
-                v-model="novoPaciente.tipoCuenta"
-                type="radio"
-                value="empresa"
-              />
-              <span>Empresa</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
       <button
         type="submit"
         class="btn-guardar"
-        :disabled="novoPaciente.dnipac === '' || novoPaciente.nompac === ''"
       >
         Gardar
       </button>
@@ -221,10 +160,9 @@
             <th>#</th>
             <th>DNI/CIF</th>
             <th>Nome</th>
+            <th>Apellidos</th>
             <th>Correo</th>
             <th>Provincia</th>
-            <th>Activo</th>
-            <th>Tipo de conta</th>
             <th>Accións</th>
           </tr>
         </thead>
@@ -238,12 +176,9 @@
               {{ u.dnipac }}
             </td>
             <td>{{ u.nompac }}</td>
+            <td>{{ u.apelpac }}</td>
             <td>{{ u.mailpac }}</td>
             <td>{{ u.propac }}</td>
-            <td class="centrado">
-              {{ u.activo ? "✅" : "❌" }}
-            </td>
-            <td>{{ u.tipoCuenta }}</td>
 
             <!-- Botones de acción: editar y eliminar el paciente. -->
             <td class="centrado">
@@ -280,6 +215,8 @@ import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
 import { getPacientes, savePaciente } from "../api/pacientes.js";
 
 const pacientes = ref([]);
+const dniInput = ref(null);
+const errorDniServidor = ref(false);
 
 const novoPaciente = reactive({
   nompac: "",
@@ -290,9 +227,7 @@ const novoPaciente = reactive({
   movilpac: "",
   dirpac: "",
   propac: "",
-  munipac: "",
-  activo: true,
-  tipoCuenta: "particular"
+  munipac: ""
 });
 
 /// Zona de ciclo de vida
@@ -321,12 +256,25 @@ async function cargarMunicipios() {
 /// Zona de métodos ou funcións
 
 async function guardarPaciente() {
+  errorDniServidor.value = false;
+
+  if (hayError("dni")) {
+    dniInput.value?.focus();
+    return;
+  }
+
   try {
         const pacienteGuardado = await savePaciente(novoPaciente);
     		pacientes.value.push(pacienteGuardado);
     		console.log("Paciente gardado correctamente");
         getPacientes(); // Actualiza la lista de pacientes después de guardar
   } catch (error) {
+    if (error.response?.status === 409) {
+      errorDniServidor.value = true;
+      dniInput.value?.focus();
+      return;
+    }
+
     console.error("Error ao gardar paciente:", error);
   }
 }
@@ -403,26 +351,17 @@ function esDniCorrecto() {
   return letraDni === letraCorrecta;
 }
 
+function dniDuplicado() {
+  const dni = novoPaciente.dnipac.trim().toUpperCase();
+
+  return dni !== "" && pacientes.value.some(
+    paciente => String(paciente.dnipac || "").trim().toUpperCase() === dni
+  );
+}
+
 function hayError(campo) {
   if (campo === "dni") {
-    return novoPaciente.dnipac !== "" && !esDniCorrecto();
-  }
-
-  if (campo === "nome") {
-    return novoPaciente.nompac === "";
-  }
-
-  if (campo === "correo") {
-    return novoPaciente.mailpac === "";
-  }
-
-  if (campo === "localidad") {
-    return novoPaciente.propac === "";
-  }
-
-  // El móbil es válido solo si no está vacío y empieza por 6 o 7.
-  if (campo === "mobil") {
-    return novoPaciente.movilpac !== "" && !/^[67]/.test(novoPaciente.movilpac);
+    return novoPaciente.dnipac !== "" && (!esDniCorrecto() || dniDuplicado());
   }
 
   return false;
@@ -480,76 +419,30 @@ form {
 
 /* Cada fila reparte sus campos en horizontal con flexbox. */
 .fila {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
   gap: 1rem; /* separación entre los campos de una fila */
 }
 
-/* Fila centrada: se usa para los campos "Activo" y "Tipo de conta". */
-.fila-centrada {
-  justify-content: center;
-}
-
-/* Un campo = label + control, alineados en horizontal.
-   El label tiene un ancho fijo para que los inputs queden alineados.
-
-   min-width: 0 → por defecto los item de flex tienen
-   "min-width: auto", que impide encoger por debajo del ancho
-   natural del input (~170px). Eso hacía que, en ventanas medianas,
-   las filas de 3 campos no cupieran y todo se saliera por la
-   derecha. Con min-width: 0 el campo puede estrecharse. */
+/* Labels arriba y controles a ancho completo para igualar cada columna. */
 .campo {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
   min-width: 0;
 }
 
-/* Ancho relativo de cada campo. La suma de los "flex" de una fila
-   reparte entre ellos el ancho disponible:
-   - flex: 2 → el doble de ancho que un flex: 1.
-   Se le da más ancho al DNI, Correo y Dirección porque sus labels
-   son más largos y, en el caso del DNI, debe caber el error debajo. */
-.campo-dni {
-  flex: 2;
-}
-.campo-nome {
-  flex: 1;
-}
-.campo-apellidos {
-  flex: 1;
-}
-.campo-fecha {
-  flex: 1;
-}
-.campo-correo {
-  flex: 2;
-}
-.campo-mobil {
-  flex: 1;
-}
-.campo-direccion {
-  flex: 2;
-}
-.campo-provincia {
-  flex: 1;
-}
-
-/* Solo el label DIRECTO del campo (>.label) recibe ancho fijo.
-   Así los labels de los radios, que están más anidados, no se ven
-   afectados. */
 .campo > label {
-  min-width: 80px;
   font-weight: 500;
 }
 
-/* Inputs y select del formulario: mismo aspecto para todos.
-   min-width: 0 → permite que el input se estreche cuando la fila
-   no tiene espacio (si no, el ancho natural del input ~170px forzaba
-   el desborde en ventanas medianas). */
 .campo input,
 .campo select {
-  flex: 1;
+  width: 100%;
+  height: 2.75rem;
+  flex: none;
   min-width: 0;
   padding: 0.5rem;
   border: 1px solid var(--color-borde);
@@ -557,54 +450,18 @@ form {
   box-sizing: border-box;
 }
 
-/* Campo inválido: se activa con :class="{ incorrecto: hayError(...) }". */
-.incorrecto {
+/* Mantiene el error visible tras interactuar hasta que el campo sea válido. */
+form input:user-invalid,
+form select:user-invalid,
+form .incorrecto {
   border: 2px solid var(--color-error) !important;
   background-color: rgba(227, 52, 47, 0.15); /* rojo muy suave de fondo */
-}
-
-/* Contenedor especial de los campos con error debajo (DNI y Móbil):
-   input + mensaje de error en columna.
-
-   min-height reserva SIEMPRE el hueco del posible mensaje de error
-   y justify-content:center centra el contenido dentro de ese alto.
-   De esta forma, cuando aparece el aviso, la altura de la fila NO
-   cambia y los campos vecinos no se mueven ni se descentran. */
-.campo-control {
-  flex: 1;
-  min-width: 0; /* igual que .campo: permite encoger (evita desbordes) */
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* centra el contenido en el alto reservado */
-  gap: 0.25rem;
-  min-height: 3.6rem; /* altura con el hueco del error ya reservado */
-}
-
-/* Mensaje de error que se muestra bajo el campo con error. */
-.mensaxe-erro {
-  color: var(--color-error);
-  font-size: 0.8rem;
-  font-weight: bold;
 }
 
 /* Texto centrado: se aplica al DNI en el formulario y a algunas
    celdas de la tabla. */
 .centrado {
   text-align: center;
-}
-
-/* Controles en línea: checkbox "Activo" y los dos radios. */
-.inline-control {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-
-/* Cada opción de radio (Particular / Empresa) es un label + radio. */
-.radios label {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
 }
 
 /* Botón principal "Gardar": verde, centrado debajo del formulario. */
@@ -706,7 +563,7 @@ h4 {
   }
 
   .fila {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 0.5rem;
   }
 }

@@ -26,10 +26,10 @@ import FooTer from './components/FooTer.vue'
    centralizado en src/style.css, que se importa en main.js.
    ============================================================ */
 
-/* Contenedor principal: centrado, con un ancho máximo del 80%
-   de la pantalla y ocupando todo el alto como mínimo. */
+/* Contenedor principal: centrado y adaptable al ancho de la ventana. */
 #app {
-  max-width: 80vw;           /* ancho máximo de la aplicación */
+  width: min(96vw, 1600px);
+  max-width: none;
   min-height: 100vh;         /* la app ocupa al menos todo el alto */
   margin: 0 auto;            /* centra el contenedor horizontalmente */
   padding: 1rem 0;           /* respiro arriba y abajo (prepara futuro footer) */

@@ -15,7 +15,24 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
     try {
         console.log("Datos recibidos:", req.body);
-        const paciente = new Paciente(req.body)
+        const dnipac = String(req.body.dnipac ?? "").trim().toUpperCase();
+        const movilpac = String(req.body.movilpac ?? "").replace(/\s+/g, "");
+
+        if (!/^[67]\d{8}$/.test(movilpac)) {
+            return res.status(400).json({
+                mensaje: "El móvil debe empezar por 6 o 7 y tener 9 dígitos"
+            });
+        }
+
+        const pacienteDuplicado = await Paciente.findOne({ dnipac });
+
+        if (pacienteDuplicado) {
+            return res.status(409).json({
+                mensaje: "Ya existe un paciente con ese DNI"
+            });
+        }
+
+        const paciente = new Paciente({ ...req.body, dnipac, movilpac })
 
         const nuevoPaciente = await paciente.save()
 
