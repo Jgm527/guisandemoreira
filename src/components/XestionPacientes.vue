@@ -134,7 +134,7 @@
             <option
               v-for="provincia in provincias"
               :key="provincia.id"
-              :value="provincia.id"
+              :value="provincia.nm"
             >
               {{ provincia.nm }}
             </option>
@@ -154,7 +154,7 @@
             <option
               v-for="municipio in municipios"
               :key="municipio.id"
-              :value="municipio.id"
+              :value="municipio.nm"
             >
               {{ municipio.nm }}
             </option>
@@ -310,33 +310,22 @@ async function cargarMunicipios() {
     municipios.value = [];
     return;
   }
-  municipios.value = await obtenerMunicipios(novoPaciente.propac);
+
+  const provincia = provincias.value.find(
+    p => p.nm === novoPaciente.propac
+  );
+
+  municipios.value = await obtenerMunicipios(provincia.id);
 }
 
 /// Zona de métodos ou funcións
 
 async function guardarPaciente() {
   try {
-        //tomar el nombre del municipio seleccionado y asignarlo a novoPaciente.munipac
-        //y de la provincia seleccionado y asignarlo a novoPaciente.propac
-        const provincia = provincias.value.find(
-              p => p.id === novoPaciente.propac
-          );
-
-          const municipio = municipios.value.find(
-            m => m.id === novoPaciente.munipac
-          );
-
-          if (!provincia || !municipio) return;
-
-  			const pacienteGuardado = await savePaciente({
-            ...novoPaciente,
-            propac: provincia.nm,
-            munipac: municipio.nm
-          });
+        const pacienteGuardado = await savePaciente(novoPaciente);
     		pacientes.value.push(pacienteGuardado);
     		console.log("Paciente gardado correctamente");
-        // getPacientes(); // Actualiza la lista de pacientes después de guardar
+        getPacientes(); // Actualiza la lista de pacientes después de guardar
   } catch (error) {
     console.error("Error ao gardar paciente:", error);
   }

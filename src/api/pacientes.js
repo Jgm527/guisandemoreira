@@ -4,6 +4,7 @@ const API_URL = "http://localhost:3000/api";
 
 export async function getPacientes() {
     const res = await axios.get(`${API_URL}/pacientes`)
+    res.data.sort((a, b) => a.apelpac.localeCompare(b.apelpac, "es", { sensitivity: "base" }))
     return res.data
 }
 

@@ -8,8 +8,7 @@ router.get("/", async (req, res) => {
         const pacientes = await Paciente.find()
         res.json(pacientes)
     } catch (error) {
-        console.error("ERROR AL LISTAR PACIENTES:", error)
-        res.status(500).json({ mensaje: "Error al listar los pacientes" })
+        res.status(500).json({ mensaje: ("Error al listar los pacientes", error)})
     }
 })
 
