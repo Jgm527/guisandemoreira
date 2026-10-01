@@ -38,7 +38,7 @@
           <label>Nome:</label>
 
           <input
-            v-model="novoPaciente.nompac"
+            v-model="novoPaciente.nomepac"
             type="text"
             required
             @blur="sanitizarNome"
@@ -175,7 +175,7 @@
             <td class="centrado">
               {{ u.dnipac }}
             </td>
-            <td>{{ u.nompac }}</td>
+            <td>{{ u.nomepac }}</td>
             <td>{{ u.apelpac }}</td>
             <td>{{ u.mailpac }}</td>
             <td>{{ u.propac }}</td>
@@ -219,7 +219,7 @@ const dniInput = ref(null);
 const errorDniServidor = ref(false);
 
 const novoPaciente = reactive({
-  nompac: "",
+  nomepac: "",
   dnipac: "",
   apelpac: "",
   nacipac: "",
@@ -315,7 +315,7 @@ function capitalizarNome(texto) {
 }
 
 function sanitizarNome() {
-  novoPaciente.nompac = capitalizarNome(novoPaciente.nompac);
+  novoPaciente.nomepac = capitalizarNome(novoPaciente.nomepac);
 }
 
 function sanitizarApellidos() {
