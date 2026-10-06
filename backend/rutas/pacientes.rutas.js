@@ -62,4 +62,35 @@ router.delete("/:dni", async (req, res) => {
     }
 });
 
+router.put("/:dni", async (req, res) => {
+    try {
+        const paciente = await Paciente.findOneAndUpdate(
+            { dnipac: req.params.dni },
+            req.body,
+            { new: true }
+        );
+
+        if (!paciente) {
+            return res.status(404).json({ mensaje: "Paciente no encontrado" });
+        }
+
+        res.json(paciente);
+        
+    } catch {
+        res.status(500).json({ mensaje: "Error al modificar el paciente" });
+    }
+});
+
+router.get("/:dni", async (req, res) => {
+    try {
+        const paciente = await Paciente.findOne({ dnipac: req.params.dni }).lean();
+        if (!paciente) {
+            return res.status(404).json({ mensaje: "Paciente no encontrado" });
+        }
+        res.json(paciente);
+    } catch (error) {
+        res.status(500).json({ mensaje: "Error al buscar el paciente", error });
+    }
+});
+
 export default router;

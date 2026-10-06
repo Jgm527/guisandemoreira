@@ -21,17 +21,37 @@
         <div class="campo campo-dni">
           <label>DNI/CIF:</label>
 
-          <input
-            ref="dniInput"
-            v-model="novoPaciente.dnipac"
-            :class="{ incorrecto: hayError('dni') || errorDniServidor }"
-            class="centrado"
-            type="text"
-            pattern="[0-9]{8}[A-Za-z]"
-            required
-            @input="errorDniServidor = false"
-            @blur="sanitizarDni"
-          />
+          <div class="dni-control">
+            <input
+              ref="dniInput"
+              v-model="novoPaciente.dnipac"
+              :class="{ incorrecto: hayError('dni') || errorDniServidor }"
+              class="centrado"
+              type="text"
+              pattern="[0-9]{8}[A-Za-z]"
+              required
+              @input="errorDniServidor = false"
+              @blur="sanitizarDni"
+            />
+            <div class="dni-acciones">
+              <button
+                type="button"
+                title="Buscar paciente"
+                aria-label="Buscar paciente"
+                @click="buscarPaciente"
+              >
+                🔎
+              </button>
+              <button
+                type="button"
+                title="Limpiar formulario"
+                aria-label="Limpiar formulario"
+                @click="limpiaFormpac"
+              >
+                🧹
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="campo campo-nome">
@@ -60,20 +80,12 @@
       <div class="fila">
         <div class="campo campo-fecha">
           <label>Fecha:</label>
-          <input
-            v-model="novoPaciente.nacipac"
-            type="date"
-            required
-          />
+          <input v-model="novoPaciente.nacipac" type="date" required />
         </div>
 
         <div class="campo campo-correo">
           <label>Correo:</label>
-          <input
-            v-model="novoPaciente.mailpac"
-            type="email"
-            required
-          />
+          <input v-model="novoPaciente.mailpac" type="email" required />
         </div>
 
         <div class="campo campo-mobil">
@@ -91,11 +103,7 @@
       <div class="fila">
         <div class="campo campo-direccion">
           <label>Dirección:</label>
-          <input
-            v-model="novoPaciente.dirpac"
-            type="text"
-            required
-          />
+          <input v-model="novoPaciente.dirpac" type="text" required />
         </div>
 
         <div class="campo campo-provincia">
@@ -120,11 +128,7 @@
         <div class="campo campo-provincia">
           <label>Municipio:</label>
 
-          <select
-            id="municipio"
-            v-model="novoPaciente.munipac"
-            required
-          >
+          <select id="municipio" v-model="novoPaciente.munipac" required>
             <option value="">-- Escolle un municipio --</option>
             <option
               v-for="municipio in municipios"
@@ -137,12 +141,32 @@
         </div>
       </div>
 
-      <button
-        type="submit"
-        class="btn-guardar"
-      >
-        Gardar
-      </button>
+      <div>
+        <label>
+          <input v-model="novoPaciente.lopdpac" type="checkbox" /> Aceptar la
+          <a
+            :href="$router.resolve({ name: 'PoliticaPrivacidad' }).href"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Política de Privacidad y Confidencialidad
+          </a>
+        </label>
+      </div>
+      <div>
+        <button
+          type="submit"
+          class="btn-guardar"
+          :disabled="novoPaciente.dnipac === '' ||
+            novoPaciente.nomepac === '' ||
+            novoPaciente.apelpac === '' ||
+            novoPaciente.movilpac === '' ||
+            !novoPaciente.lopdpac"
+        >
+          Gardar
+        </button>
+        
+      </div>
     </form>
 
     <h4>📋 Listaxe de pacientes</h4>
@@ -212,11 +236,18 @@
 
 import { ref, reactive, onMounted } from "vue";
 import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
-import { getPacientes, savePaciente, deletePaciente } from "../api/pacientes.js";
+import {
+  getPacientes,
+  savePaciente,
+  deletePaciente,
+  modifyPaciente,
+  getPacienteByDni
+} from "../api/pacientes.js";
 
 const pacientes = ref([]);
 const dniInput = ref(null);
 const errorDniServidor = ref(false);
+const editando = ref(false);
 
 const novoPaciente = reactive({
   nomepac: "",
@@ -227,7 +258,8 @@ const novoPaciente = reactive({
   movilpac: "",
   dirpac: "",
   propac: "",
-  munipac: ""
+  munipac: "",
+  lopdpac: false,
 });
 
 /// Zona de ciclo de vida
@@ -246,9 +278,7 @@ async function cargarMunicipios() {
     return;
   }
 
-  const provincia = provincias.value.find(
-    p => p.nm === novoPaciente.propac
-  );
+  const provincia = provincias.value.find((p) => p.nm === novoPaciente.propac);
 
   municipios.value = await obtenerMunicipios(provincia.id);
 }
@@ -256,27 +286,30 @@ async function cargarMunicipios() {
 /// Zona de métodos ou funcións
 
 async function guardarPaciente() {
-  errorDniServidor.value = false;
-
-  if (hayError("dni")) {
-    dniInput.value?.focus();
-    return;
-  }
-
   try {
-        const pacienteGuardado = await savePaciente(novoPaciente);
-    		pacientes.value.push(pacienteGuardado);
-    		console.log("Paciente gardado correctamente");
-        getPacientes(); // Actualiza la lista de pacientes después de guardar
-  } catch (error) {
-    if (error.response?.status === 409) {
-      errorDniServidor.value = true;
-      dniInput.value?.focus();
-      return;
+    if (editando.value) {
+      const pacienteModificado = await modifyPaciente(novoPaciente.dnipac, novoPaciente);
+
+      const index = pacientes.value.findIndex(
+        (p) => p.dnipac === pacienteModificado.dnipac
+      );
+
+      if (index !== -1) {
+        pacientes.value[index] = pacienteModificado;
+      }
+      console.log("Paciente modificado correctamente");
+    } else {
+      const pacienteGuardado = await savePaciente(novoPaciente);
+      pacientes.value.push(pacienteGuardado);
+
+      console.log("Paciente gardado correctamente")
     }
 
+    editando.value = false;
+  } catch (error) {
     console.error("Error ao gardar paciente:", error);
   }
+  pacientes.value = await getPacientes();
 }
 
 async function eliminarPaciente(index) {
@@ -290,10 +323,15 @@ async function eliminarPaciente(index) {
   }
 }
 
-function editarPaciente(index) {
+async function editarPaciente(index) {
   const paciente = pacientes.value[index];
 
   Object.assign(novoPaciente, paciente);
+
+  delete novoPaciente._id;
+  editando.value = true;
+
+  await cargarMunicipios();
 }
 
 /// Zona de sanitización (limpieza) de campos
@@ -360,9 +398,51 @@ function esDniCorrecto() {
 function dniDuplicado() {
   const dni = novoPaciente.dnipac.trim().toUpperCase();
 
-  return dni !== "" && pacientes.value.some(
-    paciente => String(paciente.dnipac || "").trim().toUpperCase() === dni
+  return (
+    dni !== "" &&
+    pacientes.value.some(
+      (paciente) =>
+        String(paciente.dnipac || "")
+          .trim()
+          .toUpperCase() === dni && paciente.dnipac !== novoPaciente.dnipac,
+    )
   );
+}
+
+function limpiaFormpac() {
+  Object.keys(novoPaciente).forEach((key) => {
+    if (typeof novoPaciente[key] === "boolean") {
+      novoPaciente[key] = false;
+    } else {
+      novoPaciente[key] = "";
+    }
+  });
+
+  editando.value = false;
+}
+
+async function buscarPaciente() {
+  try {
+    const dni = novoPaciente.dnipac.trim();
+
+    if (!dni) {
+      console.log("Introduce un DNI")
+      return;
+    }
+
+    const paciente = await getPacienteByDni(dni);
+
+    Object.assign(novoPaciente, paciente);
+    await cargarMunicipios();
+
+    console.log("Paciente encontrado:", paciente);
+  } catch (error) {
+    if (error.response?.status === 404) {
+      console.log("Paciente no encontrado");
+    } else {
+      console.error("Error al buscar paciente:", error);
+    }
+  }
 }
 
 function hayError(campo) {
@@ -444,6 +524,39 @@ form {
   font-weight: 500;
 }
 
+.dni-control {
+  display: flex;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.campo .dni-control > input {
+  width: 0;
+  flex: 1 1 0;
+}
+
+.dni-acciones {
+  display: grid;
+  grid-template-rows: repeat(2, 1.3rem);
+  gap: 0.15rem;
+}
+
+.dni-acciones button {
+  width: 1.3rem;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0;
+  border: 1px solid var(--color-borde);
+  border-radius: 4px;
+  background: white;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.dni-acciones button:hover {
+  background-color: #f0f0f0;
+}
+
 .campo input,
 .campo select {
   width: 100%;
@@ -484,10 +597,22 @@ form .incorrecto {
   transition: background-color 0.2s; /* suaviza el cambio de color al pasar el ratón */
 }
 
+
 /* Efecto al pasar el ratón: verde un poco más oscuro para dar
    señal visual de que el botón es clicable. */
 .btn-guardar:hover {
   background-color: #1b4965;
+}
+
+
+.btn-guardar:disabled {
+  background-color: var(--color-borde);
+  cursor: not-allowed;
+  opacity: 0.7; /* hace que el botón parezca desactivado */
+}
+
+.btn-guardar:disabled:hover {
+  background-color: var(--color-borde);
 }
 
 /* ------------------------------------------------------------
