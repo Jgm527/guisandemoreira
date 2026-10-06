@@ -2,15 +2,19 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import Inicio from '../components/Inicio.vue'
 import XestionPacientes from '../components/XestionPacientes.vue'
+import XestionDoctores from '../components/XestionDoctores.vue'
 import SobreNos from '../components/SobreNos.vue'
 import AvisoLegal from '../components/AvisoLegal.vue'
+import PoliticaPrivacidad from '../components/PoliticaPrivacidad.vue'
 import NotFound from '../components/NotFound.vue'
 
 const routes = [
     { path: '/', name: 'Inicio', component: Inicio },
     { path: '/XestionPacientes', name: 'XestionPacientes', component: XestionPacientes },
+    { path: '/XestionDoctores', name: 'XestionDoctores', component: XestionDoctores },
     { path: '/SobreNos', name: 'SobreNos', component: SobreNos },
-    { path: '/avisoLegal', name: AvisoLegal, component: AvisoLegal},
+    { path: '/avisoLegal', name: 'AvisoLegal', component: AvisoLegal},
+    { path: '/politica-privacidad', name: 'PoliticaPrivacidad', component: PoliticaPrivacidad },
     { path: '/:pathMatch(.*)', name: 'NotFound', component: NotFound }
 ]
 
