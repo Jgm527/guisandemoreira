@@ -85,7 +85,17 @@
 
         <div class="campo campo-correo">
           <label>Correo:</label>
-          <input v-model="novoPaciente.mailpac" type="email" required />
+          <input
+            v-model="novoPaciente.mailpac"
+            :class="{ incorrecto: mailTocado && !validarMail(novoPaciente.mailpac) }"
+            type="email"
+            required
+            @input="mailTocado = true"
+            @blur="sanitizarMail"
+          />
+          <small v-if="mailTocado && !validarMail(novoPaciente.mailpac)" class="erro-mail">
+            Introduce un correo electrónico válido.
+          </small>
         </div>
 
         <div class="campo campo-mobil">
@@ -243,11 +253,18 @@ import {
   modifyPaciente,
   getPacienteByDni
 } from "../api/pacientes.js";
+import {
+    alertaExito,
+    alertaError,
+    alertaInfo,
+    alertaConfirmacion,
+} from "../utils/alertas.js"
 
 const pacientes = ref([]);
 const dniInput = ref(null);
 const errorDniServidor = ref(false);
 const editando = ref(false);
+const mailTocado = ref(false);
 
 const novoPaciente = reactive({
   nomepac: "",
@@ -268,8 +285,14 @@ const provincias = ref([]);
 const municipios = ref([]);
 
 onMounted(async () => {
-  pacientes.value = await getPacientes();
-  provincias.value = await obtenerProvincias();
+  try {
+    [pacientes.value, provincias.value] = await Promise.all([
+      getPacientes(),
+      obtenerProvincias(),
+    ]);
+  } catch (error) {
+    alertaError(mensaxeDoErro(error, "No se pudieron cargar los pacientes y las provincias."));
+  }
 });
 
 async function cargarMunicipios() {
@@ -279,13 +302,53 @@ async function cargarMunicipios() {
   }
 
   const provincia = provincias.value.find((p) => p.nm === novoPaciente.propac);
+  if (!provincia) {
+    municipios.value = [];
+    alertaError("No se encontró la provincia seleccionada.");
+    return;
+  }
 
-  municipios.value = await obtenerMunicipios(provincia.id);
+  try {
+    municipios.value = await obtenerMunicipios(provincia.id);
+  } catch (error) {
+    municipios.value = [];
+    alertaError(mensaxeDoErro(error, "No se pudieron cargar los municipios."));
+  }
 }
 
 /// Zona de métodos ou funcións
 
 async function guardarPaciente() {
+  sanitizarDni();
+  novoPaciente.mailpac = novoPaciente.mailpac.trim();
+  mailTocado.value = true;
+  if (!validarMail(novoPaciente.mailpac)) {
+    alertaError("Introduce un correo electrónico válido.", "Datos no válidos");
+    return;
+  }
+
+  if (!esDniCorrecto()) {
+    alertaError("Introduce un DNI válido.", "Datos no válidos");
+    dniInput.value?.focus();
+    return;
+  }
+
+  if (dniDuplicado()) {
+    alertaError("Ya existe un paciente con ese DNI.", "DNI duplicado");
+    return;
+  }
+
+  const confirmacion = await alertaConfirmacion(
+    editando.value
+      ? "¿Quieres guardar los cambios de este paciente?"
+      : "¿Quieres guardar este paciente?",
+    editando.value ? "Confirmar cambios" : "Confirmar alta"
+  );
+  if (!confirmacion.isConfirmed) {
+    return;
+  }
+
+  let mensajeExito;
   try {
     if (editando.value) {
       const pacienteModificado = await modifyPaciente(novoPaciente.dnipac, novoPaciente);
@@ -297,29 +360,50 @@ async function guardarPaciente() {
       if (index !== -1) {
         pacientes.value[index] = pacienteModificado;
       }
-      console.log("Paciente modificado correctamente");
+      mensajeExito = "El paciente se ha actualizado correctamente.";
     } else {
       const pacienteGuardado = await savePaciente(novoPaciente);
       pacientes.value.push(pacienteGuardado);
-
-      console.log("Paciente gardado correctamente")
+      mensajeExito = "El paciente se ha guardado correctamente.";
     }
 
     editando.value = false;
   } catch (error) {
     console.error("Error ao gardar paciente:", error);
+    alertaError(mensaxeDoErro(error, "No se pudo guardar el paciente."));
+    return;
   }
-  pacientes.value = await getPacientes();
+
+  await alertaExito(mensajeExito);
+  try {
+    pacientes.value = await getPacientes();
+  } catch (error) {
+    alertaError(mensaxeDoErro(error, "El paciente se guardó, pero no se pudo actualizar la lista."));
+  }
 }
 
 async function eliminarPaciente(index) {
+  const paciente = pacientes.value[index];
+  if (!paciente) {
+    alertaError("No se encontró el paciente que intentas eliminar.");
+    return;
+  }
+
+  const confirmacion = await alertaConfirmacion(
+    `¿Quieres eliminar a ${paciente.nomepac} ${paciente.apelpac}?`,
+    "Eliminar paciente"
+  );
+  if (!confirmacion.isConfirmed) {
+    return;
+  }
+
   try {
-    await deletePaciente(pacientes.value[index].dnipac);
+    await deletePaciente(paciente.dnipac);
     pacientes.value.splice(index, 1);
-    console.log("Paciente eliminado correctamente");
-    getPacientes(); // Actualiza la lista de pacientes después de eliminar
+    alertaExito("El paciente se ha eliminado correctamente.");
   } catch (error) {
     console.error("Error ao eliminar paciente:", error);
+    alertaError(mensaxeDoErro(error, "No se pudo eliminar el paciente."));
   }
 }
 
@@ -364,6 +448,15 @@ function sanitizarApellidos() {
 // validación "empieza por 6 o 7" sea correcta.
 function sanitizarMobil() {
   novoPaciente.movilpac = novoPaciente.movilpac.replace(/\s+/g, "");
+}
+
+function sanitizarMail() {
+  novoPaciente.mailpac = novoPaciente.mailpac.trim();
+  mailTocado.value = true;
+}
+
+function validarMail(mail) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(mail ?? "").trim());
 }
 
 /// Funciones auxiliares
@@ -422,27 +515,33 @@ function limpiaFormpac() {
 }
 
 async function buscarPaciente() {
+  const dni = novoPaciente.dnipac.trim().toUpperCase();
+  if (!dni) {
+    alertaInfo("Introduce un DNI para buscar al paciente.");
+    dniInput.value?.focus();
+    return;
+  }
+
+  sanitizarDni();
   try {
-    const dni = novoPaciente.dnipac.trim();
-
-    if (!dni) {
-      console.log("Introduce un DNI")
-      return;
-    }
-
-    const paciente = await getPacienteByDni(dni);
+    const paciente = await getPacienteByDni(novoPaciente.dnipac);
 
     Object.assign(novoPaciente, paciente);
+    editando.value = true;
     await cargarMunicipios();
-
-    console.log("Paciente encontrado:", paciente);
+    alertaInfo("Se ha encontrado el paciente.");
   } catch (error) {
     if (error.response?.status === 404) {
-      console.log("Paciente no encontrado");
+      alertaInfo("No se encontró ningún paciente con ese DNI.", "Paciente no encontrado");
     } else {
       console.error("Error al buscar paciente:", error);
+      alertaError(mensaxeDoErro(error, "No se pudo buscar el paciente."));
     }
   }
+}
+
+function mensaxeDoErro(error, porDefecto) {
+  return error.response?.data?.mensaje || error.response?.data?.message || porDefecto;
 }
 
 function hayError(campo) {
@@ -575,6 +674,10 @@ form select:user-invalid,
 form .incorrecto {
   border: 2px solid var(--color-error) !important;
   background-color: rgba(227, 52, 47, 0.15); /* rojo muy suave de fondo */
+}
+
+.erro-mail {
+  color: var(--color-error);
 }
 
 /* Texto centrado: se aplica al DNI en el formulario y a algunas
