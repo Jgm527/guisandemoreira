@@ -43,7 +43,6 @@ router.post("/", async (req, res) => {
         
     } catch (error) {
         console.error("ERROR AL CREAR PACIENTE:", error)
-
         res.status(500).json({
             mensaje: "Error al crear el paciente"
         })
