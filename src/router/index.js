@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Inicio from '../components/Inicio.vue'
 import XestionPacientes from '../components/XestionPacientes.vue'
 import XestionDoctores from '../components/XestionDoctores.vue'
+import Citas from '../components/Citas.vue'
 import SobreNos from '../components/SobreNos.vue'
 import AvisoLegal from '../components/AvisoLegal.vue'
 import PoliticaPrivacidad from '../components/PoliticaPrivacidad.vue'
@@ -12,6 +13,7 @@ const routes = [
     { path: '/', name: 'Inicio', component: Inicio },
     { path: '/XestionPacientes', name: 'XestionPacientes', component: XestionPacientes },
     { path: '/XestionDoctores', name: 'XestionDoctores', component: XestionDoctores },
+    { path: '/citas', name: 'Citas', component: Citas},
     { path: '/SobreNos', name: 'SobreNos', component: SobreNos },
     { path: '/avisoLegal', name: 'AvisoLegal', component: AvisoLegal},
     { path: '/politica-privacidad', name: 'PoliticaPrivacidad', component: PoliticaPrivacidad },

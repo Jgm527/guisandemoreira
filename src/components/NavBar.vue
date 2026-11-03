@@ -1,17 +1,39 @@
 <template>
-  <nav class="navbar">
-    <div class="logo">XestiónApp</div>
+  <nav class="flex items-center justify-between bg-[#1b4965] px-24 py-[0.1rem] text-white">
+    <div class="text-base leading-[normal] font-bold">XestiónApp</div>
 
-    <!-- NUEVO -->
-    <button class="hamburger" @click="isOpen = !isOpen">☰</button>
+    <button
+      class="hidden border-0 bg-transparent text-2xl leading-[normal] text-white max-[768px]:block"
+      type="button"
+      aria-label="Abrir menú"
+      :aria-expanded="isOpen"
+      @click="isOpen = !isOpen"
+    >
+      ☰
+    </button>
 
-    <!-- MODIFICADO -->
-    <ul :class="['menu', { open: isOpen }]">
-      <li><RouterLink to="/">Inicio</RouterLink></li>
-      <li><RouterLink to="/xestionPacientes">Pacientes</RouterLink></li>
-      <li><RouterLink to="/xestionDoctores">Doctores</RouterLink></li>
-      <li><RouterLink to="/tarefas">Tarefas</RouterLink></li>
-      <li><RouterLink to="/sobrenos">Sobre nós</RouterLink></li>
+    <ul
+      :class="isOpen ? 'max-[768px]:flex' : 'max-[768px]:hidden'"
+      class="m-0 flex list-none gap-[0.8rem] p-0 max-[768px]:absolute max-[768px]:right-0 max-[768px]:top-[50px] max-[768px]:flex-col max-[768px]:bg-[#1b4965] max-[768px]:p-4"
+    >
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/">Inicio</RouterLink>
+      </li>
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/xestionPacientes">Pacientes</RouterLink>
+      </li>
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/xestionDoctores">Doctores</RouterLink>
+      </li>
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/citas">Citas</RouterLink>
+      </li>
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/tarefas">Tarefas</RouterLink>
+      </li>
+      <li>
+        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/sobrenos">Sobre nós</RouterLink>
+      </li>
     </ul>
   </nav>
 </template>
@@ -20,65 +42,3 @@
 import { ref } from "vue" // será boolean
 const isOpen = ref(false) // actívase cuando fago click
 </script>
-
-<style scoped>
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.1rem 6rem;
-  background: #1b4965;
-  color: white;
-}
-
-.logo {
-  font-weight: bold;
-  font-size: 1rem;
-}
-
-.menu {
-  display: flex;
-  gap: 0.8rem;
-  list-style: none;
-}
-
-.menu a {
-  color: white;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.menu a.router-link-active {
-  border-bottom: 0.2rem solid #ffe66d;
-}
-
-/* NUEVO */
-.hamburger {
-  display: none;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 1.5rem;
-}
-
-/* NUEVO (responsive) */
-@media (max-width: 768px) {
-  .hamburger {
-    display: block;
-  }
-
-  .menu {
-    display: none;
-    position: absolute;
-    top: 50px;
-    right: 0;
-    flex-direction: column;
-    background: #1b4965;
-    padding: 1rem;
-  }
-
-  .menu.open {
-    display: flex;
-  }
-}
-</style>

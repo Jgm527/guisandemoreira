@@ -7,6 +7,7 @@ import mongoose from 'mongoose' //Importa modulo de conexión a mongoDB
 import pacientesRutas from './rutas/pacientes.rutas.js'
 
 import doctoresRutas from './rutas/doctores.rutas.js'
+import citasRutas from './rutas/citas.rutas.js'
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI;
@@ -15,6 +16,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/pacientes", pacientesRutas);
 app.use("/api/doctores", doctoresRutas);
+app.use("/api/citas", citasRutas);
 app.get("/api/municipios", (req, res) => {
   console.log("petición recibida");
 
