@@ -1,14 +1,21 @@
 services:
   mongodb:
+    # MongoDB se ejecuta en contenedor para el desarrollo local.
     image: mongo:8.0
+    # Nombre estable para reconocer el contenedor en Docker.
     container_name: mongodb
+    # Reinicia el servicio salvo que se detenga explicitamente.
     restart: unless-stopped
     environment:
+      # Credenciales locales para inicializar MongoDB; configura secretos seguros fuera de desarrollo.
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: abc123
     ports:
+      # Publica la base local en el puerto por defecto que usa la aplicacion.
       - "27017:27017"
     volumes:
+      # Persiste los datos aunque el contenedor se elimine o se actualice.
       - mongodb_data:/data/db
 volumes:
+  # Volumen nombrado administrado por Docker.
   mongodb_data:

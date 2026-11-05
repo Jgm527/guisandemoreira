@@ -7,7 +7,9 @@
     Este ejemplo guarda los elementos solo en memoria. Para guardarlos
     en MongoDB, sigue los pasos y ejemplos de GUIA-CREAR-COMPONENTE.md.
   -->
+  <!-- Tailwind combina layout, espaciado, color y sombra sin crear CSS por componente. -->
   <section class="box-border w-full min-w-0 rounded-lg bg-white p-8 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+    <!-- titulo es un ref del script; {{ }} muestra su valor reactivo. -->
     <h4>{{ titulo }}</h4>
 
     <!--
@@ -15,6 +17,7 @@
       recargue la página. El botón submit debe estar dentro del formulario.
     -->
     <form class="mb-6 grid gap-4" @submit.prevent="guardarElemento">
+      <!-- grid y gap-* son utilidades Tailwind para distribuir label e input. -->
       <div class="grid gap-[0.4rem]">
         <label for="titulo-elemento">Nombre:</label>
 
@@ -32,6 +35,7 @@
         >
       </div>
 
+      <!-- El segundo v-model actualiza elemento.descripcion del mismo objeto reactive. -->
       <div class="campo">
         <label for="descripcion-elemento">Descripción:</label>
         <textarea
@@ -62,6 +66,7 @@
       :key debe ser un identificador estable y único para que Vue actualice
       la lista correctamente.
     -->
+    <!-- Cada item procede de elementos; eliminarElemento se declara en el script setup. -->
     <ul
       v-else
       class="grid list-none gap-3 p-0"
@@ -98,23 +103,25 @@
 </template>
 
 <script setup>
+// Importa solo las primitivas de Vue que necesita este ejemplo local.
 import { computed, reactive, ref } from "vue"
 
-// ref guarda un valor reactivo simple. Cambiarlo actualiza el template.
+// Titulo mostrado en la cabecera; ref permite cambiarlo sin volver a renderizar a mano.
 const titulo = ref("Plantilla de componente")
 
-// reactive resulta cómodo para un objeto de formulario con varios campos.
+// Modelo del formulario; reactive hace que cada propiedad pueda enlazarse con v-model.
 const elemento = reactive({
   nombre: "",
   descripcion: ""
 })
 
-// ref también puede guardar una lista; en JavaScript se accede con .value.
+// Lista local de elementos: al no usar una API, se vacia al recargar la pagina.
 const elementos = ref([])
 
-// computed deriva un valor de otros datos reactivos.
+// Total derivado de la lista; se recalcula automaticamente cuando cambia elementos.
 const totalElementos = computed(() => elementos.value.length)
 
+// Agrega una copia del formulario a la lista y deja el formulario listo para otra alta.
 function guardarElemento() {
   // trim limpia espacios sobrantes; el formulario ya requiere un nombre.
   elementos.value.push({
@@ -131,6 +138,7 @@ function guardarElemento() {
   console.log(`Elementos guardados: ${totalElementos.value}`)
 }
 
+// Elimina de la lista local el elemento que coincide con el identificador recibido.
 function eliminarElemento(id) {
   // filter crea una lista nueva sin el elemento seleccionado.
   elementos.value = elementos.value.filter((item) => item.id !== id)

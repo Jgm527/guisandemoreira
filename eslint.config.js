@@ -1,8 +1,8 @@
 import js from '@eslint/js'
 import vue from 'eslint-plugin-vue'
 import globals from 'globals'
-  //colocar en la raíz del proyecto
 
+// Configuracion plana de ESLint: reglas base y reglas recomendadas para Vue.
 export default [
   // Reglas básicas de JavaScript
   js.configs.recommended,
@@ -11,7 +11,7 @@ export default [
   ...vue.configs['flat/recommended'],
 
   {
-    // Ficheros a los que se aplica esta configuración
+    // Ficheros de aplicacion en los que se aplican las opciones comunes de lenguaje.
     files: ['**/*.{js,mjs,cjs,vue}'],
 
     languageOptions: {
@@ -19,6 +19,7 @@ export default [
       sourceType: 'module',
 
       globals: {
+        // Reconoce APIs del navegador y de Node sin marcarlas como variables indefinidas.
         ...globals.browser,
         ...globals.node
       }
@@ -50,7 +51,7 @@ export default [
   },
 
   {
-    // Directorios que no queremos analizar
+    // Evita analizar dependencias instaladas y resultados generados por Vite.
     ignores: [
       'node_modules/',
       'dist/'

@@ -1,8 +1,11 @@
 <template>
+  <!-- Pantalla de alta/edicion y listado de doctores. -->
   <section class="xestion-doctores">
     <h4>💊 Xestión de doctores</h4>
 
+    <!-- El submit llama a guardarDoctor(); editando determina si crea o modifica. -->
     <form @submit.prevent="guardarDoctor">
+      <!-- v-model sincroniza controles con novoDoctor, definido como objeto reactive en el script. -->
       <div class="fila">
         <div class="campo campo-id">
           <label for="iddoc">ID:</label>
@@ -39,9 +42,12 @@
         </div>
       </div>
 
+      <!-- Eventos de entrada llaman a sanitizarMobil/sanitizarMail y las reglas usan valores computed. -->
       <div class="fila">
         <fieldset class="campo campo-colexiado">
+          <!-- El usuario debe elegir una de las dos opciones de colegiacion. -->
           <legend>Colexiado:</legend>
+          <span>
           <label>
             <input v-model="novoDoctor.coledoc" type="radio" value="SI" required />
             Si
@@ -50,6 +56,7 @@
             <input v-model="novoDoctor.coledoc" type="radio" value="NO" required />
             Non
           </label>
+          </span>
         </fieldset>
 
         <div class="campo campo-mobil">
@@ -89,6 +96,7 @@
         </div>
       </div>
 
+      <!-- especialidades se carga en onMounted y se convierte en opciones del selector. -->
       <div class="fila">
         <div class="campo campo-especialidade">
           <label for="especdoc">Especialidade:</label>
@@ -112,6 +120,7 @@
 
       <p v-if="erro" class="mensaxe-erro" role="alert">{{ erro }}</p>
 
+      <!-- Un solo formulario sirve para altas y ediciones; los botones varian segun editando. -->
       <div class="form-acciones">
         <button type="submit" class="btn-guardar">
           {{ editando ? "Gardar cambios" : "Gardar doctor" }}
@@ -125,8 +134,10 @@
       </div>
     </form>
 
+    <!-- Tabla con las acciones disponibles para cada doctor guardado. -->
     <h4>Listaxe de doctores</h4>
 
+    <!-- doctores se rellena con cargarDoctores(); v-for crea una fila por documento. -->
     <div v-if="doctores.length" class="tabla-doctores">
       <table>
         <thead>
@@ -150,6 +161,7 @@
             <td>{{ doctor.movildoc }}</td>
             <td>{{ doctor.maildoc || "—" }}</td>
             <td>{{ doctor.especdoc }}</td>
+            <!-- Los eventos reciben el doctor actual para editarlo o eliminarlo. -->
             <td class="celda-acciones">
               <button class="btn-accion" type="button" title="Editar doctor" @click="editarDoctor(doctor)">
                 ✏️
@@ -167,7 +179,9 @@
 </template>
 
 <script setup>
+// Reactividad y ciclo de vida de Vue usados por el formulario y el listado.
 import { computed, onMounted, reactive, ref } from "vue";
+// Operaciones HTTP sobre la coleccion de doctores.
 import {
   deleteDoctor,
   getDoctores,
@@ -175,13 +189,16 @@ import {
   saveDoctor,
   getDoctorByEspecialidad,
 } from "../api/doctores.js";
+// Catalogo que alimenta el selector de especialidades.
 import { obtenerEspecialidades } from "../api/especialidades.js";
+// Dialogos reutilizables para confirmar acciones y comunicar resultados.
 import {
   alertaConfirmacion,
   alertaError,
   alertaExito,
 } from "../utils/alertas.js";
 
+// Devuelve un formulario limpio. Se usa al inicializarlo y despues de guardar/cancelar.
 const doctorVacio = () => ({
   nomedoc: "",
   apeldoc: "",
@@ -191,24 +208,33 @@ const doctorVacio = () => ({
   especdoc: "",
 });
 
+// Listas reactivas usadas por la tabla y los selectores de la pantalla.
 const doctores = ref([]);
 const especialidades = ref([]);
+// Formulario editable: reactive permite enlazar cada campo con v-model directamente.
 const novoDoctor = reactive(doctorVacio());
+// Indica si el submit debe crear un doctor o actualizar el seleccionado.
 const editando = ref(false);
+// Mensaje persistente de error que tambien se muestra junto al formulario.
 const erro = ref("");
+// Recuerda si el usuario ya interactuo con el correo antes de mostrar su validacion.
 const mailTocado = ref(false);
+// Valida reactivamente que el movil tenga nueve digitos y empiece por 6 o 7.
 const mobilInvalido = computed(
   () => novoDoctor.movildoc !== "" && !/^[67]\d{8}$/.test(novoDoctor.movildoc)
 );
+// Valida el correo solo despues de que el usuario haya tocado el campo opcional.
 const mailInvalido = computed(
   () => mailTocado.value && novoDoctor.maildoc !== "" && !validarMail(novoDoctor.maildoc)
 );
 
+// Carga los doctores y las especialidades cuando Vue termina de montar la pantalla.
 onMounted(async () => {
   doctores.value = await cargarDoctores();
   especialidades.value = await cargarEspecialidades();
 });
 
+// Obtiene el catalogo del backend; el array vacio deja el selector inhabilitado si falla.
 async function cargarEspecialidades() {
   try {
     return await obtenerEspecialidades();
@@ -219,6 +245,7 @@ async function cargarEspecialidades() {
   }
 }
 
+// Recupera la lista actualizada de doctores para la tabla.
 async function cargarDoctores() {
   try {
     return await getDoctores();
@@ -229,6 +256,7 @@ async function cargarDoctores() {
   }
 }
 
+// Valida, confirma y crea o actualiza el doctor segun el modo actual del formulario.
 async function guardarDoctor() {
   erro.value = "";
   novoDoctor.maildoc = novoDoctor.maildoc.trim();
@@ -245,6 +273,7 @@ async function guardarDoctor() {
     return;
   }
 
+  // La peticion solo se envia despues de que el usuario confirme la operacion.
   const confirmacion = await alertaConfirmacion(
     editando.value
       ? "¿Quieres guardar los cambios de este doctor?"
@@ -256,6 +285,7 @@ async function guardarDoctor() {
   }
 
   try {
+    // Copia el formulario para enviar un objeto independiente al modulo de API.
     const datosDoctor = { ...novoDoctor };
     if (editando.value) {
       await modifyDoctor(novoDoctor._id, datosDoctor);
@@ -273,6 +303,7 @@ async function guardarDoctor() {
   }
 }
 
+// Copia un doctor existente al formulario y activa el modo de edicion.
 function editarDoctor(doctor) {
   Object.assign(novoDoctor, doctorVacio(), {
     _id: doctor._id ?? "",
@@ -287,7 +318,9 @@ function editarDoctor(doctor) {
   editando.value = true;
 }
 
+// Solicita confirmacion antes de eliminar y refresca la lista si el servidor responde bien.
 async function eliminarDoctor(doctor) {
+  // La respuesta determina si se continua o se cancela la eliminacion.
   const confirmacion = await alertaConfirmacion(
     `Queres eliminar o doctor ${doctor.nomedoc} ${doctor.apeldoc}?`,
     "Eliminar doctor"
@@ -310,12 +343,14 @@ async function eliminarDoctor(doctor) {
   }
 }
 
+// Restaura los valores iniciales y elimina errores y estado de edicion.
 function limparFormulario() {
   Object.assign(novoDoctor, doctorVacio());
   editando.value = false;
   erro.value = "";
 }
 
+// Normaliza nombres propios para que cada palabra empiece en mayuscula.
 function capitalizarNome(texto) {
   return texto
     .trim()
@@ -323,22 +358,28 @@ function capitalizarNome(texto) {
     .replace(/(^|\s)(\S)/g, (coincidencia, espazo, letra) => espazo + letra.toUpperCase());
 }
 
+// Elimina espacios del movil tanto en el evento del input como en el modelo reactivo.
 function sanitizarMobil(event) {
+  // Valor normalizado que se sincroniza tanto con el input como con el modelo Vue.
   const mobil = event.target.value.replace(/\s+/g, "");
   event.target.value = mobil;
   novoDoctor.movildoc = mobil;
 }
 
+// Recorta espacios del correo y permite mostrar despues su mensaje de validacion.
 function sanitizarMail() {
   novoDoctor.maildoc = novoDoctor.maildoc.trim();
   mailTocado.value = true;
 }
 
+// Acepta el correo vacio porque es opcional; si se rellena, comprueba un formato basico.
 function validarMail(mail) {
+  // Texto sin espacios externos antes de comprobar el formato.
   const correo = String(mail ?? "").trim();
   return correo === "" || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo);
 }
 
+// Extrae el mensaje enviado por Express y usa el texto alternativo si no existe.
 function mensaxeDoErro(error, porDefecto) {
   return error.response?.data?.mensaje || error.response?.data?.message || porDefecto;
 }

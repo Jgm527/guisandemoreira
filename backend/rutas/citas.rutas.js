@@ -3,8 +3,10 @@ import Cita from "../modelos/Cita.js"
 import Doctor from "../modelos/Doctor.js"
 import Paciente from "../modelos/Paciente.js"
 
+// Router independiente: server.js lo monta bajo /api/citas.
 const router = express.Router()
 
+// Lista blanca de propiedades que se aceptan al crear o editar una cita.
 const camposCita = [
     "pacienteId",
     "doctorId",
@@ -15,7 +17,9 @@ const camposCita = [
     "estado"
 ]
 
+// Descarta campos no admitidos para evitar guardar propiedades arbitrarias del cliente.
 function datosPermitidos(body) {
+    // Si la peticion llega sin cuerpo, se procesa como un objeto vacio.
     const datosRecibidos = body ?? {}
     return Object.fromEntries(
         camposCita
@@ -24,6 +28,7 @@ function datosPermitidos(body) {
     )
 }
 
+// Comprueba que las referencias de paciente y doctor apunten a documentos existentes.
 async function validarRelaciones(datos) {
     if (datos.pacienteId && !(await Paciente.exists({ _id: datos.pacienteId }))) {
         return "El paciente seleccionado no existe"
@@ -36,8 +41,10 @@ async function validarRelaciones(datos) {
     return ""
 }
 
+// GET /api/citas: devuelve las citas ordenadas cronologicamente.
 router.get("/", async (req, res) => {
     try {
+        // lean() devuelve objetos simples y el orden facilita mostrar las proximas citas primero.
         const citas = await Cita.find().sort({ fecha: 1, hora: 1 }).lean()
         res.json(citas)
     } catch (error) {
@@ -46,15 +53,19 @@ router.get("/", async (req, res) => {
     }
 })
 
+// POST /api/citas: valida las relaciones y guarda una cita nueva.
 router.post("/", async (req, res) => {
     try {
+        // Normaliza los campos antes de validar referencias o crear el documento.
         const datos = datosPermitidos(req.body)
+        // Mensaje vacio indica que ambas referencias apuntan a registros existentes.
         const errorRelacion = await validarRelaciones(datos)
 
         if (errorRelacion) {
             return res.status(400).json({ mensaje: errorRelacion })
         }
 
+        // Documento que Mongoose valida y persiste antes de devolverlo en la respuesta.
         const cita = await Cita.create(datos)
         res.status(201).json(cita)
     } catch (error) {
@@ -67,15 +78,19 @@ router.post("/", async (req, res) => {
     }
 })
 
+// PUT /api/citas/:id: actualiza los campos permitidos de una cita existente.
 router.put("/:id", async (req, res) => {
     try {
+        // Conserva solamente las propiedades de cita admitidas por la lista blanca.
         const datos = datosPermitidos(req.body)
+        // Impide que la edicion asigne referencias a registros inexistentes.
         const errorRelacion = await validarRelaciones(datos)
 
         if (errorRelacion) {
             return res.status(400).json({ mensaje: errorRelacion })
         }
 
+        // Retorna la version actualizada y vuelve a comprobar las reglas del esquema.
         const cita = await Cita.findByIdAndUpdate(
             req.params.id,
             datos,
@@ -97,8 +112,10 @@ router.put("/:id", async (req, res) => {
     }
 })
 
+// DELETE /api/citas/:id: elimina una cita usando el identificador de MongoDB.
 router.delete("/:id", async (req, res) => {
     try {
+        // El resultado permite responder 404 cuando el identificador no existia.
         const cita = await Cita.findByIdAndDelete(req.params.id)
 
         if (!cita) {

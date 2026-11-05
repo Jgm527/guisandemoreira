@@ -1,7 +1,9 @@
 <template>
+  <!-- Navegacion principal; RouterLink cambia de pantalla sin recargar la aplicacion. -->
   <nav class="flex items-center justify-between bg-[#1b4965] px-24 py-[0.1rem] text-white">
     <div class="text-base leading-[normal] font-bold">XestiónApp</div>
 
+    <!-- isOpen del script controla el menu movil y se refleja tambien en aria-expanded. -->
     <button
       class="hidden border-0 bg-transparent text-2xl leading-[normal] text-white max-[768px]:block"
       type="button"
@@ -12,6 +14,7 @@
       ☰
     </button>
 
+    <!-- max-[768px]:* aplica cambios responsive; :class muestra u oculta la lista con isOpen. -->
     <ul
       :class="isOpen ? 'max-[768px]:flex' : 'max-[768px]:hidden'"
       class="m-0 flex list-none gap-[0.8rem] p-0 max-[768px]:absolute max-[768px]:right-0 max-[768px]:top-[50px] max-[768px]:flex-col max-[768px]:bg-[#1b4965] max-[768px]:p-4"
@@ -39,6 +42,8 @@
 </template>
 
 <script setup>
-import { ref } from "vue" // será boolean
-const isOpen = ref(false) // actívase cuando fago click
+import { ref } from "vue"
+
+// Controla la visibilidad del menu movil y se enlaza al boton y a la lista de enlaces.
+const isOpen = ref(false)
 </script>

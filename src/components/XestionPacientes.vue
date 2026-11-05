@@ -16,11 +16,13 @@
          - Nome      → primera letra de cada palabra en mayúscula.
          - Apellidos → igual que Nome.
          - Móbil     → se quitan los espacios (debe empezar por 6 o 7). -->
+    <!-- El submit llama a guardarPaciente(); los v-model se enlazan a novoPaciente en el script. -->
     <form @submit.prevent="guardarPaciente">
       <div class="fila">
         <div class="campo campo-dni">
           <label>DNI/CIF:</label>
 
+          <!-- ref permite enfocar el DNI desde el script; los botones llaman busqueda y limpieza. -->
           <div class="dni-control">
             <input
               ref="dniInput"
@@ -110,6 +112,7 @@
         </div>
       </div>
 
+      <!-- Provincia cambia cargarMunicipios(); el selector de municipio usa su lista resultante. -->
       <div class="fila">
         <div class="campo campo-direccion">
           <label>Dirección:</label>
@@ -187,6 +190,7 @@
          La tabla va envuelta en .tabla-wrapper: si no cabe en
          horizontal, aparece un scroll DENTRO de la tarjeta en vez
          de desbordar el contenido por el lado derecho. -->
+    <!-- pacientes se carga al montar la pantalla; la fila usa el registro de la lista. -->
     <div v-if="pacientes.length > 0" class="tabla-wrapper">
       <table>
         <thead>
@@ -242,10 +246,11 @@
 </template>
 
 <script setup>
-/// Zona de declaracións
-
+// API reactiva, objetos de formulario y evento de inicializacion de Vue.
 import { ref, reactive, onMounted } from "vue";
+// Catalogo de provincias/municipios que alimenta los selectores de ubicacion.
 import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
+// Operaciones de lectura y escritura de pacientes en el backend.
 import {
   getPacientes,
   savePaciente,
@@ -253,6 +258,7 @@ import {
   modifyPaciente,
   getPacienteByDni
 } from "../api/pacientes.js";
+// Dialogos comunes usados para confirmar acciones o informar de sus resultados.
 import {
     alertaExito,
     alertaError,
@@ -260,12 +266,18 @@ import {
     alertaConfirmacion,
 } from "../utils/alertas.js"
 
+// Registros cargados desde la API y mostrados en la tabla.
 const pacientes = ref([]);
+// Referencia al input DNI para devolverle el foco cuando sea necesario corregirlo.
 const dniInput = ref(null);
+// Fuerza la indicacion visual cuando la API rechaza el DNI del formulario.
 const errorDniServidor = ref(false);
+// Distingue la creacion de un registro de la edicion de uno existente.
 const editando = ref(false);
+// Evita mostrar el error de correo antes de que el usuario empiece a editarlo.
 const mailTocado = ref(false);
 
+// Estado del formulario enlazado desde el template con v-model.
 const novoPaciente = reactive({
   nomepac: "",
   dnipac: "",
@@ -279,11 +291,11 @@ const novoPaciente = reactive({
   lopdpac: false,
 });
 
-/// Zona de ciclo de vida
-
+// Catalogos independientes: provincia elegida y municipios que le corresponden.
 const provincias = ref([]);
 const municipios = ref([]);
 
+// Carga en paralelo la lista y las provincias, gestionando cada fallo por separado.
 onMounted(async () => {
   const [resultadoPacientes, resultadoProvincias] = await Promise.allSettled([
     getPacientes(),
@@ -303,12 +315,15 @@ onMounted(async () => {
   }
 });
 
+// Actualiza los municipios disponibles segun la provincia elegida en el formulario.
 async function cargarMunicipios() {
   if (novoPaciente.propac === "") {
     municipios.value = [];
     return;
   }
 
+  // Busca el codigo interno de la provincia a partir del nombre almacenado en el modelo.
+  // Objeto de provincia necesario porque el API de municipios recibe su codigo, no el nombre.
   const provincia = provincias.value.find((p) => p.nm === novoPaciente.propac);
   if (!provincia) {
     municipios.value = [];
@@ -324,8 +339,7 @@ async function cargarMunicipios() {
   }
 }
 
-/// Zona de métodos ou funcións
-
+// Valida el formulario, confirma la accion y crea o actualiza al paciente en el servidor.
 async function guardarPaciente() {
   sanitizarDni();
   novoPaciente.mailpac = novoPaciente.mailpac.trim();
@@ -346,6 +360,7 @@ async function guardarPaciente() {
     return;
   }
 
+  // isConfirmed indica si se puede continuar con la escritura en el servidor.
   const confirmacion = await alertaConfirmacion(
     editando.value
       ? "¿Quieres guardar los cambios de este paciente?"
@@ -356,11 +371,14 @@ async function guardarPaciente() {
     return;
   }
 
+  // Texto de confirmacion distinto para altas y ediciones.
   let mensajeExito;
   try {
     if (editando.value) {
+      // Respuesta del backend usada para sustituir la fila que se acaba de editar.
       const pacienteModificado = await modifyPaciente(novoPaciente.dnipac, novoPaciente);
 
+      // Posicion del paciente actualizado dentro de la lista reactiva.
       const index = pacientes.value.findIndex(
         (p) => p.dnipac === pacienteModificado.dnipac
       );
@@ -370,6 +388,7 @@ async function guardarPaciente() {
       }
       mensajeExito = "El paciente se ha actualizado correctamente.";
     } else {
+      // Documento nuevo que se agrega provisionalmente hasta recargar la lista oficial.
       const pacienteGuardado = await savePaciente(novoPaciente);
       pacientes.value.push(pacienteGuardado);
       mensajeExito = "El paciente se ha guardado correctamente.";
@@ -390,13 +409,16 @@ async function guardarPaciente() {
   }
 }
 
+// Elimina por DNI y quita de la tabla el registro confirmado por el servidor.
 async function eliminarPaciente(index) {
+  // El indice de la fila identifica el objeto actual dentro de pacientes.value.
   const paciente = pacientes.value[index];
   if (!paciente) {
     alertaError("No se encontró el paciente que intentas eliminar.");
     return;
   }
 
+  // La promesa devuelve isConfirmed para decidir si se elimina o se cancela.
   const confirmacion = await alertaConfirmacion(
     `¿Quieres eliminar a ${paciente.nomepac} ${paciente.apelpac}?`,
     "Eliminar paciente"
@@ -415,7 +437,9 @@ async function eliminarPaciente(index) {
   }
 }
 
+// Copia los datos de la fila seleccionada al formulario y carga sus municipios.
 async function editarPaciente(index) {
+  // Registro seleccionado que se copia al modelo del formulario.
   const paciente = pacientes.value[index];
 
   Object.assign(novoPaciente, paciente);
@@ -425,8 +449,6 @@ async function editarPaciente(index) {
 
   await cargarMunicipios();
 }
-
-/// Zona de sanitización (limpieza) de campos
 
 // DNI: al SALIR del campo, quita los espacios y pasa la letra
 // final a mayúscula de forma automática.
@@ -444,10 +466,12 @@ function capitalizarNome(texto) {
     .replace(/(^|\s)(\S)/g, (m, espazo, letra) => espazo + letra.toUpperCase());
 }
 
+// Aplica la normalizacion de nombre al campo correspondiente.
 function sanitizarNome() {
   novoPaciente.nomepac = capitalizarNome(novoPaciente.nomepac);
 }
 
+// Aplica la normalizacion de apellidos al campo correspondiente.
 function sanitizarApellidos() {
   novoPaciente.apelpac = capitalizarNome(novoPaciente.apelpac);
 }
@@ -458,45 +482,47 @@ function sanitizarMobil() {
   novoPaciente.movilpac = novoPaciente.movilpac.replace(/\s+/g, "");
 }
 
+// Elimina espacios externos y activa la validacion visual tras la interaccion.
 function sanitizarMail() {
   novoPaciente.mailpac = novoPaciente.mailpac.trim();
   mailTocado.value = true;
 }
 
+// Comprueba el formato basico de correo; el servidor sigue siendo la validacion final.
 function validarMail(mail) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(mail ?? "").trim());
 }
 
-/// Funciones auxiliares
-
+// Verifica formato y letra de control del DNI espanol antes de enviar el formulario.
 function esDniCorrecto() {
-  // Comprobamos que tenga 8 números y una letra mayúscula
+  // regex comprueba que tenga ocho numeros y una letra mayuscula antes del calculo.
   const regex = /^\d{8}[A-Z]$/;
 
   if (!regex.test(novoPaciente.dnipac)) {
     return false;
   }
 
-  // Array de letras del DNI
+  // Tabla de letras: el resto de dividir el numero entre 23 elige la letra de control.
   const letras = "TRWAGMYFPDXBNJZSQVHLCKE";
 
-  // Cogemos solamente los 8 números
+  // Parte numerica del DNI usada para obtener el resto de control.
   const numero = parseInt(novoPaciente.dnipac.substring(0, 8));
 
-  // Calculamos el resto de dividir entre 23
+  // Posicion de la letra correcta en la tabla anterior.
   const resto = numero % 23;
 
-  // La letra correcta es la que ocupa esa posición
-  // en el array
+  // Caracter de control calculado a partir del numero de DNI.
   const letraCorrecta = letras[resto];
 
-  // Comparamos la letra calculada con la del DNI
+  // Caracter de control escrito en la novena posicion del DNI.
   const letraDni = novoPaciente.dnipac.charAt(8);
 
   return letraDni === letraCorrecta;
 }
 
+// Comprueba duplicados en la lista cargada, ignorando diferencias de espacios o mayusculas.
 function dniDuplicado() {
+  // DNI normalizado para comparar sin depender de mayusculas o espacios.
   const dni = novoPaciente.dnipac.trim().toUpperCase();
 
   return (
@@ -510,6 +536,7 @@ function dniDuplicado() {
   );
 }
 
+// Restaura todos los campos al tipo y valor inicial, y sale del modo edicion.
 function limpiaFormpac() {
   Object.keys(novoPaciente).forEach((key) => {
     if (typeof novoPaciente[key] === "boolean") {
@@ -522,7 +549,9 @@ function limpiaFormpac() {
   editando.value = false;
 }
 
+// Busca en el servidor el paciente cuyo DNI se ha escrito y carga sus datos en el formulario.
 async function buscarPaciente() {
+  // Copia normalizada para comprobar que se introdujo algun valor antes de llamar a la API.
   const dni = novoPaciente.dnipac.trim().toUpperCase();
   if (!dni) {
     alertaInfo("Introduce un DNI para buscar al paciente.");
@@ -532,6 +561,7 @@ async function buscarPaciente() {
 
   sanitizarDni();
   try {
+    // Paciente devuelto por el backend para rellenar el formulario de edicion.
     const paciente = await getPacienteByDni(novoPaciente.dnipac);
 
     Object.assign(novoPaciente, paciente);
@@ -548,10 +578,12 @@ async function buscarPaciente() {
   }
 }
 
+// Convierte errores Axios/Express en el mensaje comprensible que se presenta al usuario.
 function mensaxeDoErro(error, porDefecto) {
   return error.response?.data?.mensaje || error.response?.data?.message || porDefecto;
 }
 
+// Devuelve si un campo debe resaltarse por un error de validacion local.
 function hayError(campo) {
   if (campo === "dni") {
     return novoPaciente.dnipac !== "" && (!esDniCorrecto() || dniDuplicado());

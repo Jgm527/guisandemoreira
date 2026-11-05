@@ -1,6 +1,8 @@
+/* Tailwind aporta los tokens de tema y las utilidades que se usan en los templates. */
 @import "tailwindcss/theme.css";
 @import "tailwindcss/utilities.css";
 
+/* Tokens globales: reutilizalos para mantener una paleta y tipografia coherentes. */
 @theme {
   --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
 }
@@ -14,6 +16,7 @@
   --color-texto: #333;
 }
 
+/* Estilos base aplicados al documento y a los encabezados comunes. */
 @layer base {
   * {
     @apply m-0 box-border p-0;
@@ -32,7 +35,9 @@
   }
 }
 
+/* Componentes compartidos: formularios/tablas, citas y adaptacion a pantallas pequenas. */
 @layer components {
+  /* Reglas de la gestion de pacientes y doctores. */
   .xestion-pacientes {
     @apply box-border w-full min-w-0 rounded-lg bg-white p-8 shadow-[0_2px_10px_rgba(0,0,0,0.05)];
   }
@@ -253,6 +258,7 @@
     @apply mt-4;
   }
 
+  /* Reglas especificas del formulario y listado de citas. */
   .xestion-citas {
     @apply box-border w-full min-w-0 rounded-lg bg-white p-8 shadow-[0_2px_10px_rgba(0,0,0,0.05)];
   }
@@ -414,6 +420,7 @@
   }
 }
 
+/* En tablet y movil se reducen columnas, espacios y anchos minimos de las tablas. */
 @media (max-width: 768px) {
   .xestion-pacientes,
   .xestion-doctores,
@@ -446,6 +453,7 @@
   }
 }
 
+/* En moviles estrechos la ficha de citas pasa a una sola columna. */
 @media (max-width: 480px) {
   .xestion-citas .citas-grid {
     @apply grid-cols-1;

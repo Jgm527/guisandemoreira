@@ -1,8 +1,11 @@
 <template>
+  <!-- Gestiona altas, ediciones, consultas y eliminaciones de citas medicas. -->
   <section class="xestion-citas">
     <h4>🗓️ Xestión de citas</h4>
 
+    <!-- El submit llama a guardarCita(); cita y formularioValido se definen en el script. -->
     <form class="citas-formulario" @submit.prevent="guardarCita">
+      <!-- Cada control enlaza con una propiedad del objeto reactivo cita. -->
       <div class="citas-grid">
         <div class="citas-campo">
           <label for="id-cita">ID cita:</label>
@@ -26,6 +29,7 @@
 
         <div class="citas-campo">
           <label for="paciente-cita">Paciente:</label>
+          <!-- pacientes viene de getPacientes(); se guarda el _id de la opcion seleccionada. -->
           <select
             id="paciente-cita"
             v-model="cita.pacienteId"
@@ -41,6 +45,7 @@
 
         <div class="citas-campo">
           <label for="doctor-cita">Doctor:</label>
+          <!-- doctores viene de getDoctores(); la relacion guardada es su identificador Mongo. -->
           <select
             id="doctor-cita"
             v-model="cita.doctorId"
@@ -88,6 +93,7 @@
         </div>
       </div>
 
+      <!-- Estos avisos dependen de las listas que cargarDatos() obtiene desde la API. -->
       <p v-if="!cargando && !pacientes.length" class="citas-aviso">
         Primero debes registrar al menos un paciente para poder crear una cita.
       </p>
@@ -96,6 +102,7 @@
       </p>
 
       <div class="citas-acciones-formulario">
+        <!-- El estado de edicion y la validacion del script cambian el texto y disponibilidad. -->
         <button class="citas-boton-principal" type="submit" :disabled="guardando || !formularioValido">
           {{ guardando ? "Guardando..." : editando ? "Guardar cambios" : "Guardar cita" }}
         </button>
@@ -110,6 +117,7 @@
 
     <div class="citas-cabecera-lista">
       <h4>📋 Listado de citas</h4>
+      <!-- Al pulsarlo vuelve a consultar citas, pacientes y doctores mediante cargarDatos(). -->
       <button
         class="citas-boton-actualizar"
         type="button"
@@ -136,6 +144,7 @@
       </button>
     </div>
 
+    <!-- Estados alternativos de la lista: carga, tabla con datos o mensaje vacio. -->
     <p v-if="cargando" class="citas-mensaje-lista">Cargando citas...</p>
     <div v-else-if="citas.length" class="citas-tabla-wrapper">
       <table>
@@ -151,6 +160,7 @@
           </tr>
         </thead>
         <tbody>
+          <!-- citas procede de la API; las funciones del script convierten relaciones y estados. -->
           <tr v-for="item in citas" :key="item._id">
             <td>{{ item.fecha }} · {{ item.hora }}</td>
             <td>{{ nombrePaciente(item.pacienteId) }}</td>
@@ -159,6 +169,7 @@
             <td>{{ etiquetaEstado(item.estado) }}</td>
             <td>{{ item.observacions || "—" }}</td>
             <td class="citas-celda-acciones">
+              <!-- Los eventos reciben la cita de esta fila y llaman a las funciones del script. -->
               <button
                 class="citas-boton-accion"
                 type="button"
@@ -189,7 +200,9 @@
 </template>
 
 <script setup>
+// Estado reactivo, valores calculados y carga inicial de la pantalla.
 import { computed, onMounted, reactive, ref } from "vue"
+// Operaciones de escritura/lectura de citas y catalogos relacionados.
 import { deleteCita, getCitas, saveCita, updateCita } from "../api/citas.js"
 import { getDoctores } from "../api/doctores.js"
 import { getPacientes } from "../api/pacientes.js"
@@ -199,6 +212,7 @@ import {
   alertaExito
 } from "../utils/alertas.js"
 
+// Fabrica valores iniciales para reutilizar el mismo formulario en altas y ediciones.
 const citaVacia = () => ({
   _id: "",
   pacienteId: "",
@@ -210,14 +224,17 @@ const citaVacia = () => ({
   estado: "pendente"
 })
 
+// Colecciones y formulario visibles desde el template.
 const citas = ref([])
 const pacientes = ref([])
 const doctores = ref([])
 const cita = reactive(citaVacia())
+// Indicadores de modo y peticiones para evitar acciones duplicadas y mostrar carga.
 const editando = ref(false)
 const cargando = ref(false)
 const guardando = ref(false)
 
+// Habilita el envio solo cuando los campos necesarios tienen contenido util.
 const formularioValido = computed(() =>
   Boolean(
     cita.fecha &&
@@ -229,12 +246,16 @@ const formularioValido = computed(() =>
   )
 )
 
+// Al abrir la pantalla se cargan citas y los registros necesarios para resolver sus referencias.
 onMounted(cargarDatos)
 
+// Refresca los tres recursos y comunica cualquier fallo; el indicador siempre se apaga.
 async function cargarDatos() {
   cargando.value = true
 
   try {
+    // Promise.all evita mostrar un listado parcial que no pueda resolver sus relaciones.
+    // Cada resultado representa una de las listas que necesita el selector o la tabla.
     const [listaCitas, listaPacientes, listaDoctores] = await Promise.all([
       getCitas(),
       getPacientes(),
@@ -250,6 +271,7 @@ async function cargarDatos() {
   }
 }
 
+// Prepara los datos, llama al endpoint correcto y actualiza la pantalla tras guardar.
 async function guardarCita() {
   if (!formularioValido.value) {
     return
@@ -257,6 +279,7 @@ async function guardarCita() {
 
   guardando.value = true
 
+  // Solo envia campos aceptados por el modelo y normaliza texto libre con trim().
   const datosCita = {
     pacienteId: cita.pacienteId,
     doctorId: cita.doctorId,
@@ -286,6 +309,7 @@ async function guardarCita() {
   }
 }
 
+// Copia la cita seleccionada al formulario y normaliza las referencias para los selectores.
 function editarCita(item) {
   Object.assign(cita, citaVacia(), {
     ...item,
@@ -297,7 +321,9 @@ function editarCita(item) {
   editando.value = true
 }
 
+// Elimina una cita tras confirmacion; limpia el formulario si se editaba esa misma cita.
 async function eliminarCita(item) {
+  // confirmacion indica si el usuario acepta borrar el registro seleccionado.
   const confirmacion = await alertaConfirmacion(
     `¿Eliminar la cita del ${item.fecha} a las ${item.hora}?`,
     "Eliminar cita"
@@ -318,32 +344,42 @@ async function eliminarCita(item) {
   }
 }
 
+// Restablece el formulario y termina el modo de edicion.
 function limpiarFormulario() {
   Object.assign(cita, citaVacia())
   editando.value = false
 }
 
+// Resuelve el identificador de paciente a su nombre para mostrarlo en la tabla.
 function nombrePaciente(pacienteId) {
+  // id normaliza tanto una referencia poblada como un identificador simple de Mongo.
   const id = idRelacionado(pacienteId)
+  // paciente es el registro local cuyo _id coincide con la relacion de la cita.
   const paciente = pacientes.value.find((item) => item._id === id)
   return paciente
     ? `${paciente.nomepac} ${paciente.apelpac}`
     : "Paciente no disponible"
 }
 
+// Resuelve el identificador de doctor a su nombre para mostrarlo en la tabla.
 function nombreDoctor(doctorId) {
+  // id normaliza la referencia para poder compararla con el listado de doctores.
   const id = idRelacionado(doctorId)
+  // doctor es el registro local que se mostrara en la fila de la cita.
   const doctor = doctores.value.find((item) => item._id === id)
   return doctor
     ? `${doctor.nomedoc} ${doctor.apeldoc}`
     : "Doctor no disponible"
 }
 
+// Devuelve siempre un string tanto si Mongoose entrega una referencia poblada como un ID.
 function idRelacionado(relacion) {
   return String(relacion?._id ?? relacion ?? "")
 }
 
+// Convierte el codigo interno de estado en una etiqueta legible para la interfaz.
 function etiquetaEstado(estado) {
+  // Traduce los codigos de base de datos a etiquetas visibles para la persona usuaria.
   const etiquetas = {
     pendente: "Pendiente",
     confirmada: "Confirmada",
@@ -353,6 +389,7 @@ function etiquetaEstado(estado) {
   return etiquetas[estado] ?? estado
 }
 
+// Extrae el mensaje del backend desde Axios o devuelve el texto alternativo.
 function mensajeError(error, porDefecto) {
   return error.response?.data?.mensaje || error.response?.data?.message || porDefecto
 }

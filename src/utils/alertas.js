@@ -1,10 +1,9 @@
 
-// GUARDAR EN CARPETA src/utils/alertas.js
-// INSTALAR LIBRERÍA CON  ==>  npm install sweetalert2
-
+// Centraliza los dialogos para que todas las pantallas compartan el mismo estilo y botones.
 import Swal from 'sweetalert2'
 
-// Alerta de éxito
+// Muestra un resultado satisfactorio y devuelve la promesa de SweetAlert2.
+// mensaje describe la operacion; titulo permite reemplazar el encabezado por defecto.
 export const alertaExito = (mensaje, titulo = 'Correcto') => {
     return Swal.fire({
         icon: 'success',
@@ -14,7 +13,7 @@ export const alertaExito = (mensaje, titulo = 'Correcto') => {
     })
 }
 
-// Alerta de error
+// Informa de una operacion fallida; devuelve la promesa para poder esperarla si hace falta.
 export const alertaError = (mensaje, titulo = 'Error') => {
     return Swal.fire({
         icon: 'error',
@@ -24,7 +23,7 @@ export const alertaError = (mensaje, titulo = 'Error') => {
     })
 }
 
-// Alerta informativa
+// Presenta informacion neutral al usuario, por ejemplo el resultado de una busqueda.
 export const alertaInfo = (mensaje, titulo = 'Información') => {
     return Swal.fire({
         icon: 'info',
@@ -34,7 +33,7 @@ export const alertaInfo = (mensaje, titulo = 'Información') => {
     })
 }
 
-// Confirmación de una acción
+// Pide confirmacion antes de una accion irreversible; el resultado incluye isConfirmed.
 export const alertaConfirmacion = (mensaje, titulo = '¿Estás seguro?') => {
     return Swal.fire({
         icon: 'question',

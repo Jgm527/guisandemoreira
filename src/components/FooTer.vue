@@ -1,5 +1,7 @@
 <template>
+  <!-- Pie compartido con enlaces legales y el ano calculado en tiempo de renderizado. -->
   <footer class="mt-auto flex items-center justify-center gap-20 bg-[#1b4965] px-24 py-[0.2rem] text-center text-[0.9rem] text-white max-[768px]:flex-col max-[768px]:gap-4 max-[768px]:px-4">
+    <!-- Utilidades Tailwind aplican el color de marca y el cambio responsive del pie. -->
     <ul class="m-0 mt-[6px] block cursor-pointer list-none p-0 text-[#f9d342]">
       <router-link
         to="/avisolegal"
@@ -13,4 +15,5 @@
   </footer>
 </template>
 
+<!-- No usa estado ni metodos: el enlace es estatico y el ano se obtiene con JavaScript. -->
 <script setup></script>

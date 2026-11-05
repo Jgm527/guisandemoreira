@@ -1,4 +1,7 @@
-<template> <div class="politica-privacidad"> <h4>Política de privacidad y confidencialidad</h4>
+<template>
+  <!-- Texto informativo mostrado al usuario antes de aceptar el tratamiento de datos. -->
+  <div class="politica-privacidad">
+  <h4>Política de privacidad y confidencialidad</h4>
 <h5>Protección de datos y confidencialidad</h5>
 
 <p>
@@ -58,4 +61,5 @@
   datos.
 </p>
 
-</div> </template>
+  </div>
+</template>
