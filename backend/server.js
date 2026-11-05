@@ -14,41 +14,36 @@ const MONGO_URI = process.env.MONGO_URI;
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use("/api/pacientes", pacientesRutas);
-app.use("/api/doctores", doctoresRutas);
-app.use("/api/citas", citasRutas);
+
+function requireDatabase(req, res, next) {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ mensaje: "La base de datos no está disponible." });
+  }
+
+  next();
+}
+
+app.use("/api/pacientes", requireDatabase, pacientesRutas);
+app.use("/api/doctores", requireDatabase, doctoresRutas);
+app.use("/api/citas", requireDatabase, citasRutas);
 app.get("/api/municipios", (req, res) => {
-  console.log("petición recibida");
-
-  const datos = fs.readFileSync("./backend/data/municipios.json", "utf-8");
-
-  const datosJson = JSON.parse(datos);
-
-  res.json(datosJson);
+  const datos = fs.readFileSync(new URL("./data/municipios.json", import.meta.url), "utf-8");
+  res.json(JSON.parse(datos));
 });
 
 app.get("/api/especialidades", (req, res) => {
-  console.log("petición recibida");
-
-  const datos = fs.readFileSync("./backend/data/especialidades.json", "utf-8");
-
-  const datosJson = JSON.parse(datos);
-
-  res.json(datosJson);
+  const datos = fs.readFileSync(new URL("./data/especialidades.json", import.meta.url), "utf-8");
+  res.json(JSON.parse(datos));
 });
 
-async function iniciarServer() {
-  try {
-    //Conectamos con mongoDB
-    await mongoose.connect(MONGO_URI);
-    console.log("Conectado a mongoDB");
+app.listen(PORT, () => {
+  console.log(`Servidor funcionando en http://localhost:${PORT}`);
+});
 
-    app.listen(PORT, () => {
-      console.log(`Servidor funcionando en http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error("error de conexión:", error);
-  }
+if (!MONGO_URI) {
+  console.error("MONGO_URI no está configurado; las rutas de base de datos no estarán disponibles.");
+} else {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log("Conectado a mongoDB"))
+    .catch((error) => console.error("Error de conexión a MongoDB:", error));
 }
-
-iniciarServer();

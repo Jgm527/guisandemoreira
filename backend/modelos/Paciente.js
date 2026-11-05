@@ -14,7 +14,7 @@ const PacienteSchema = new mongoose.Schema(
     lopdpac: { type: Boolean, required: true },
   },
   {
-    Collection: "pacientes",
+    collection: "pacientes",
   },
 );
 

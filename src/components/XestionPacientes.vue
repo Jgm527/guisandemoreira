@@ -285,13 +285,21 @@ const provincias = ref([]);
 const municipios = ref([]);
 
 onMounted(async () => {
-  try {
-    [pacientes.value, provincias.value] = await Promise.all([
-      getPacientes(),
-      obtenerProvincias(),
-    ]);
-  } catch (error) {
-    alertaError(mensaxeDoErro(error, "No se pudieron cargar los pacientes y las provincias."));
+  const [resultadoPacientes, resultadoProvincias] = await Promise.allSettled([
+    getPacientes(),
+    obtenerProvincias(),
+  ]);
+
+  if (resultadoPacientes.status === "fulfilled") {
+    pacientes.value = resultadoPacientes.value;
+  } else {
+    alertaError(mensaxeDoErro(resultadoPacientes.reason, "No se pudieron cargar los pacientes."));
+  }
+
+  if (resultadoProvincias.status === "fulfilled") {
+    provincias.value = resultadoProvincias.value;
+  } else {
+    alertaError(mensaxeDoErro(resultadoProvincias.reason, "No se pudieron cargar las provincias."));
   }
 });
 

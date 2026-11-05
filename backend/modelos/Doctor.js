@@ -10,7 +10,7 @@ const DoctorSchema = new mongoose.Schema(
     especdoc: { type: String, required: true },
   },
   {
-    Collection: "doctores",
+    collection: "doctores",
   },
 );
 

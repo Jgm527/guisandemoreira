@@ -115,3 +115,5 @@ router.delete("/:id", async (req, res) => {
         res.status(500).json({ mensaje: "Error al eliminar la cita" })
     }
 })
+
+export default router
