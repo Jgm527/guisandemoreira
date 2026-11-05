@@ -6,9 +6,11 @@ información fija, puedes omitir MongoDB y la API.
 
 Como punto de partida visual, copia
 [`src/components/PlantillaComponente.vue`](./src/components/PlantillaComponente.vue).
-Ese archivo tiene un formulario, una lista, botones y ejemplos de Vue. Su lista
-es local: los datos se pierden al recargar la página. Los estilos del proyecto
-se escriben con utilidades de Tailwind CSS.
+Ese archivo sirve como catalogo de referencia para formularios, inputs, filtros,
+mensajes, tablas y acciones CRUD. Sus datos de ejemplo son locales y se pierden
+al recargar la pagina: sigue los comentarios del script para conectarlo con
+`src/api/`. Cada campo contiene un placeholder entre corchetes para sustituirlo
+por el texto y los datos de tu entidad. Los estilos usan utilidades Tailwind CSS.
 
 ## Cómo está organizado el proyecto
 
