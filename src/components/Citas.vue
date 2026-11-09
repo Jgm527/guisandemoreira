@@ -202,6 +202,8 @@
 <script setup>
 // Estado reactivo, valores calculados y carga inicial de la pantalla.
 import { computed, onMounted, reactive, ref } from "vue"
+// Acceso al store de pacientes para poder filtrar citas por paciente.
+import { usepacienteStore } from "../store/pacienteStore.js";
 // Operaciones de escritura/lectura de citas y catalogos relacionados.
 import { deleteCita, getCitas, saveCita, updateCita } from "../api/citas.js"
 import { getDoctores } from "../api/doctores.js"
@@ -211,6 +213,9 @@ import {
   alertaError,
   alertaExito
 } from "../utils/alertas.js"
+
+// Acceso al store de pacientes para poder filtrar citas por paciente.
+const pacienteStore = usepacienteStore()
 
 // Fabrica valores iniciales para reutilizar el mismo formulario en altas y ediciones.
 const citaVacia = () => ({
@@ -247,7 +252,10 @@ const formularioValido = computed(() =>
 )
 
 // Al abrir la pantalla se cargan citas y los registros necesarios para resolver sus referencias.
-onMounted(cargarDatos)
+onMounted(async () => {
+  await cargarDatos()
+  cita.pacienteId = pacienteStore.dnipac
+})
 
 // Refresca los tres recursos y comunica cualquier fallo; el indicador siempre se apaga.
 async function cargarDatos() {
