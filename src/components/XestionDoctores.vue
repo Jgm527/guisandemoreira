@@ -149,6 +149,7 @@
             <th>Móbil</th>
             <th>Correo</th>
             <th>Especialidade</th>
+            <th>Selección</th>
             <th>Accións</th>
           </tr>
         </thead>
@@ -161,6 +162,18 @@
             <td>{{ doctor.movildoc }}</td>
             <td>{{ doctor.maildoc || "—" }}</td>
             <td>{{ doctor.especdoc }}</td>
+            <td class="centrado">
+              <button
+                class="btn-accion"
+                type="button"
+                :title="doctorStore.idDoctor === doctor._id ? 'Doctor seleccionado' : 'Seleccionar para citas'"
+                :aria-label="doctorStore.idDoctor === doctor._id ? 'Doctor seleccionado' : 'Seleccionar para citas'"
+                :aria-pressed="doctorStore.idDoctor === doctor._id"
+                @click="seleccionarDoctor(doctor)"
+              >
+                {{ doctorStore.idDoctor === doctor._id ? "✅" : "👤" }}
+              </button>
+            </td>
             <!-- Los eventos reciben el doctor actual para editarlo o eliminarlo. -->
             <td class="celda-acciones">
               <button class="btn-accion" type="button" title="Editar doctor" @click="editarDoctor(doctor)">
@@ -191,6 +204,8 @@ import {
 } from "../api/doctores.js";
 // Catalogo que alimenta el selector de especialidades.
 import { obtenerEspecialidades } from "../api/especialidades.js";
+// Store compartido con la pantalla de citas.
+import { useDoctorStore } from "../store/doctorStore.js";
 // Dialogos reutilizables para confirmar acciones y comunicar resultados.
 import {
   alertaConfirmacion,
@@ -211,6 +226,7 @@ const doctorVacio = () => ({
 // Listas reactivas usadas por la tabla y los selectores de la pantalla.
 const doctores = ref([]);
 const especialidades = ref([]);
+const doctorStore = useDoctorStore();
 // Formulario editable: reactive permite enlazar cada campo con v-model directamente.
 const novoDoctor = reactive(doctorVacio());
 // Indica si el submit debe crear un doctor o actualizar el seleccionado.
@@ -233,6 +249,11 @@ onMounted(async () => {
   doctores.value = await cargarDoctores();
   especialidades.value = await cargarEspecialidades();
 });
+
+// Guarda el doctor seleccionado para que la pantalla de citas pueda usar su ID.
+function seleccionarDoctor(doctor) {
+  doctorStore.seleccionarDoctor(doctor);
+}
 
 // Obtiene el catalogo del backend; el array vacio deja el selector inhabilitado si falla.
 async function cargarEspecialidades() {
@@ -288,7 +309,10 @@ async function guardarDoctor() {
     // Copia el formulario para enviar un objeto independiente al modulo de API.
     const datosDoctor = { ...novoDoctor };
     if (editando.value) {
-      await modifyDoctor(novoDoctor._id, datosDoctor);
+      const doctorModificado = await modifyDoctor(novoDoctor._id, datosDoctor);
+      if (String(doctorStore.idDoctor) === String(doctorModificado._id)) {
+        seleccionarDoctor(doctorModificado);
+      }
     } else {
       await saveDoctor(datosDoctor);
     }
@@ -305,6 +329,7 @@ async function guardarDoctor() {
 
 // Copia un doctor existente al formulario y activa el modo de edicion.
 function editarDoctor(doctor) {
+  seleccionarDoctor(doctor);
   Object.assign(novoDoctor, doctorVacio(), {
     _id: doctor._id ?? "",
     nomedoc: doctor.nomedoc ?? "",
@@ -332,6 +357,9 @@ async function eliminarDoctor(doctor) {
   erro.value = "";
   try {
     await deleteDoctor(doctor._id);
+    if (String(doctorStore.idDoctor) === String(doctor._id)) {
+      doctorStore.limpiarDoctor();
+    }
     doctores.value = await cargarDoctores();
     if (editando.value && novoDoctor.iddoc === doctor._id) {
       limparFormulario();

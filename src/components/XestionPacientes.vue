@@ -223,8 +223,18 @@
             <td>{{ u.mailpac }}</td>
             <td>{{ u.propac }}</td>
 
-            <!-- Botones de acción: editar y eliminar el paciente. -->
+            <!-- Seleccionar fija el paciente en Pinia; editar y eliminar gestionan la fila. -->
             <td class="centrado">
+              <button
+                class="btn-accion"
+                :title="pacienteStore.idPaciente === u._id ? 'Paciente seleccionado' : 'Seleccionar para citas'"
+                :aria-label="pacienteStore.idPaciente === u._id ? 'Paciente seleccionado' : 'Seleccionar para citas'"
+                :aria-pressed="pacienteStore.idPaciente === u._id"
+                @click="seleccionarPaciente(u)"
+              >
+                {{ pacienteStore.idPaciente === u._id ? "✅" : "👤" }}
+              </button>
+
               <button
                 class="btn-accion"
                 title="Editar"
@@ -303,10 +313,10 @@ const novoPaciente = reactive({
 // Catalogos independientes: provincia elegida y municipios que le corresponden.
 const provincias = ref([]);
 const municipios = ref([]);
+const pacienteStore = usepacienteStore();
 
 // Comparte el paciente seleccionado con otras pantallas mediante el store de Pinia.
 function seleccionarPaciente(paciente) {
-  const pacienteStore = usepacienteStore();
   pacienteStore.seleccionarPaciente(paciente);
 }
 
@@ -404,6 +414,9 @@ async function guardarPaciente() {
       if (index !== -1) {
         pacientes.value[index] = pacienteModificado;
       }
+      if (String(pacienteStore.idPaciente) === String(pacienteModificado._id)) {
+        seleccionarPaciente(pacienteModificado);
+      }
       mensajeExito = "El paciente se ha actualizado correctamente.";
     } else {
       // Documento nuevo que se agrega provisionalmente hasta recargar la lista oficial.
@@ -413,7 +426,6 @@ async function guardarPaciente() {
     }
 
     editando.value = false;
-    seleccionarPaciente(novoPaciente);
 
   } catch (error) {
     console.error("Error ao gardar paciente:", error);
@@ -451,6 +463,9 @@ async function eliminarPaciente(index) {
   try {
     await deletePaciente(paciente.dnipac);
     pacientes.value.splice(index, 1);
+    if (String(pacienteStore.idPaciente) === String(paciente._id)) {
+      pacienteStore.limpiarPaciente();
+    }
     alertaExito("El paciente se ha eliminado correctamente.");
   } catch (error) {
     console.error("Error ao eliminar paciente:", error);
@@ -464,12 +479,11 @@ async function editarPaciente(index) {
   // Registro seleccionado que se copia al modelo del formulario.
   const paciente = pacientes.value[index];
 
+  seleccionarPaciente(paciente);
   Object.assign(novoPaciente, paciente);
 
   delete novoPaciente._id;
   editando.value = true;
-
-  seleccionarPaciente(novoPaciente);
 
   await cargarMunicipios();
 }
@@ -590,6 +604,8 @@ async function buscarPaciente() {
     // Paciente devuelto por el backend para rellenar el formulario de edicion.
     const paciente = await getPacienteByDni(novoPaciente.dnipac);
 
+    // La busqueda tambien establece la seleccion global que necesita la pestaña de citas.
+    seleccionarPaciente(paciente);
     Object.assign(novoPaciente, paciente);
     editando.value = true;
     await cargarMunicipios();

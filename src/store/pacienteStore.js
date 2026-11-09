@@ -7,6 +7,7 @@ export const usepacienteStore = defineStore("paciente", {
   // desde cualquier componente que use usepacienteStore().
   state: () => ({
     pacientes: [],
+    idPaciente: null,
     dnipac: null,
     nomepac: null,
     apelpac: null,
@@ -15,12 +16,14 @@ export const usepacienteStore = defineStore("paciente", {
   actions: {
     // Copia al store los campos usados por las pantallas que dependen del paciente.
     seleccionarPaciente(paciente) {
+      this.idPaciente = paciente._id ?? null;
       this.dnipac = paciente.dnipac;
       this.nomepac = paciente.nomepac;
       this.apelpac = paciente.apelpac;
     },
     // Limpia la seleccion cuando ya no debe quedar un paciente activo.
     limpiarPaciente() {
+      this.idPaciente = null;
       this.dnipac = null;
       this.nomepac = null;
       this.apelpac = null;

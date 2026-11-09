@@ -3,6 +3,20 @@
   <section class="xestion-citas">
     <h4>🗓️ Xestión de citas</h4>
 
+    <p v-if="!pacienteStore.idPaciente && !doctorStore.idDoctor" class="citas-aviso">
+      Selecciona un paciente o un doctor en su pestaña para consultar sus citas.
+    </p>
+
+    <template v-else>
+
+    <p
+      v-if="!pacienteStore.idPaciente || !doctorStore.idDoctor"
+      class="citas-aviso"
+    >
+      Puedes consultar las citas con una selección. Para crear o editar una cita,
+      selecciona un paciente y un doctor.
+    </p>
+
     <!-- El submit llama a guardarCita(); cita y formularioValido se definen en el script. -->
     <form class="citas-formulario" @submit.prevent="guardarCita">
       <!-- Cada control enlaza con una propiedad del objeto reactivo cita. -->
@@ -29,32 +43,20 @@
 
         <div class="citas-campo">
           <label for="paciente-cita">Paciente:</label>
-          <!-- pacientes viene de getPacientes(); se guarda el _id de la opcion seleccionada. -->
-          <select
-            id="paciente-cita"
-            v-model="cita.pacienteId"
-            required
-            :disabled="cargando || pacientes.length === 0"
-          >
-            <option value="" disabled>Selecciona un paciente</option>
-            <option v-for="paciente in pacientes" :key="paciente._id" :value="paciente._id">
-              {{ paciente.nomepac }} {{ paciente.apelpac }} — {{ paciente.dnipac }}
+          <select id="paciente-cita" :value="pacienteStore.idPaciente || ''" disabled>
+            <option v-if="!pacienteStore.idPaciente" value="">Selecciona un paciente en su pestaña</option>
+            <option v-else :value="pacienteStore.idPaciente">
+              {{ pacienteStore.nomepac }} {{ pacienteStore.apelpac }} — {{ pacienteStore.dnipac }}
             </option>
           </select>
         </div>
 
         <div class="citas-campo">
           <label for="doctor-cita">Doctor:</label>
-          <!-- doctores viene de getDoctores(); la relacion guardada es su identificador Mongo. -->
-          <select
-            id="doctor-cita"
-            v-model="cita.doctorId"
-            required
-            :disabled="cargando || doctores.length === 0"
-          >
-            <option value="" disabled>Selecciona un doctor</option>
-            <option v-for="doctor in doctores" :key="doctor._id" :value="doctor._id">
-              {{ doctor.nomedoc }} {{ doctor.apeldoc }} — {{ doctor.especdoc }}
+          <select id="doctor-cita" :value="doctorStore.idDoctor || ''" disabled>
+            <option v-if="!doctorStore.idDoctor" value="">Selecciona un doctor en su pestaña</option>
+            <option v-else :value="doctorStore.idDoctor">
+              {{ doctorStore.nomedoc }} {{ doctorStore.apeldoc }} — {{ doctorStore.especdoc }}
             </option>
           </select>
         </div>
@@ -93,10 +95,7 @@
         </div>
       </div>
 
-      <!-- Estos avisos dependen de las listas que cargarDatos() obtiene desde la API. -->
-      <p v-if="!cargando && !pacientes.length" class="citas-aviso">
-        Primero debes registrar al menos un paciente para poder crear una cita.
-      </p>
+      <!-- El aviso depende de la lista de doctores obtenida desde la API. -->
       <p v-if="!cargando && !doctores.length" class="citas-aviso">
         Primero debes registrar al menos un doctor para poder crear una cita.
       </p>
@@ -117,7 +116,7 @@
 
     <div class="citas-cabecera-lista">
       <h4>📋 Listado de citas</h4>
-      <!-- Al pulsarlo vuelve a consultar citas, pacientes y doctores mediante cargarDatos(). -->
+      <!-- Actualiza las citas del paciente seleccionado y el catalogo de doctores. -->
       <button
         class="citas-boton-actualizar"
         type="button"
@@ -196,14 +195,16 @@
     <p v-else class="citas-mensaje-lista">
       No hay citas cargadas.
     </p>
+    </template>
   </section>
 </template>
 
 <script setup>
 // Estado reactivo, valores calculados y carga inicial de la pantalla.
-import { computed, onMounted, reactive, ref } from "vue"
+import { computed, onMounted, reactive, ref, watch } from "vue"
 // Acceso al store de pacientes para poder filtrar citas por paciente.
 import { usepacienteStore } from "../store/pacienteStore.js";
+import { useDoctorStore } from "../store/doctorStore.js";
 // Operaciones de escritura/lectura de citas y catalogos relacionados.
 import { deleteCita, getCitas, saveCita, updateCita } from "../api/citas.js"
 import { getDoctores } from "../api/doctores.js"
@@ -216,6 +217,7 @@ import {
 
 // Acceso al store de pacientes para poder filtrar citas por paciente.
 const pacienteStore = usepacienteStore()
+const doctorStore = useDoctorStore()
 
 // Fabrica valores iniciales para reutilizar el mismo formulario en altas y ediciones.
 const citaVacia = () => ({
@@ -244,44 +246,79 @@ const formularioValido = computed(() =>
   Boolean(
     cita.fecha &&
     cita.hora &&
-    cita.pacienteId &&
-    cita.doctorId &&
+    pacienteStore.idPaciente &&
+    doctorStore.idDoctor &&
     cita.motivo.trim() &&
     cita.estado
   )
 )
 
-// Al abrir la pantalla se cargan citas y los registros necesarios para resolver sus referencias.
+// Al abrir la pantalla basta con que haya un paciente o un doctor seleccionado.
 onMounted(async () => {
-  await cargarDatos()
-  cita.pacienteId = pacienteStore.dnipac
+  if (pacienteStore.idPaciente || doctorStore.idDoctor) {
+    await cargarDatos()
+  }
 })
 
-// Refresca los tres recursos y comunica cualquier fallo; el indicador siempre se apaga.
+// Si cambia cualquiera de las selecciones, se descarta el formulario y la lista anterior.
+watch(() => [pacienteStore.idPaciente, doctorStore.idDoctor], async ([idPaciente, idDoctor]) => {
+  citas.value = []
+  pacientes.value = []
+  doctores.value = []
+  limpiarFormulario()
+
+  if (idPaciente || idDoctor) {
+    await cargarDatos()
+  }
+})
+
+// Refresca citas y catalogos, filtrando por cada seleccion que exista en Pinia.
 async function cargarDatos() {
+  const idPaciente = pacienteStore.idPaciente
+  const idDoctor = doctorStore.idDoctor
+  if (!idPaciente && !idDoctor) {
+    citas.value = []
+    pacientes.value = []
+    doctores.value = []
+    return
+  }
+
   cargando.value = true
 
   try {
-    // Promise.all evita mostrar un listado parcial que no pueda resolver sus relaciones.
-    // Cada resultado representa una de las listas que necesita el selector o la tabla.
+    // Los catalogos permiten mostrar el nombre de la otra persona aunque solo
+    // se haya seleccionado paciente o doctor en su pestaña.
     const [listaCitas, listaPacientes, listaDoctores] = await Promise.all([
       getCitas(),
       getPacientes(),
       getDoctores()
     ])
-    citas.value = listaCitas
+
+    // Ignora una respuesta tardia si entretanto cambio cualquiera de las selecciones.
+    if (
+      String(pacienteStore.idPaciente) !== String(idPaciente) ||
+      String(doctorStore.idDoctor) !== String(idDoctor)
+    ) {
+      return
+    }
+
+    citas.value = listaCitas.filter((item) =>
+      (!idPaciente || idRelacionado(item.pacienteId) === String(idPaciente)) &&
+      (!idDoctor || idRelacionado(item.doctorId) === String(idDoctor))
+    )
     pacientes.value = listaPacientes
     doctores.value = listaDoctores
   } catch (error) {
-    alertaError(mensajeError(error, "No se pudieron cargar las citas y los datos relacionados."))
+    alertaError(mensajeError(error, "No se pudieron cargar las citas, pacientes y doctores."))
   } finally {
     cargando.value = false
   }
 }
 
-// Prepara los datos, llama al endpoint correcto y actualiza la pantalla tras guardar.
+// Para crear o editar el backend exige ambos identificadores, aunque el listado
+// pueda consultarse filtrando solo por una de las dos selecciones.
 async function guardarCita() {
-  if (!formularioValido.value) {
+  if (!pacienteStore.idPaciente || !doctorStore.idDoctor || !formularioValido.value) {
     return
   }
 
@@ -289,8 +326,8 @@ async function guardarCita() {
 
   // Solo envia campos aceptados por el modelo y normaliza texto libre con trim().
   const datosCita = {
-    pacienteId: cita.pacienteId,
-    doctorId: cita.doctorId,
+    pacienteId: pacienteStore.idPaciente,
+    doctorId: doctorStore.idDoctor,
     fecha: cita.fecha,
     hora: cita.hora,
     motivo: cita.motivo.trim(),
@@ -358,15 +395,19 @@ function limpiarFormulario() {
   editando.value = false
 }
 
-// Resuelve el identificador de paciente a su nombre para mostrarlo en la tabla.
+// Busca el paciente relacionado en el catálogo, con el store como respaldo.
 function nombrePaciente(pacienteId) {
-  // id normaliza tanto una referencia poblada como un identificador simple de Mongo.
   const id = idRelacionado(pacienteId)
-  // paciente es el registro local cuyo _id coincide con la relacion de la cita.
-  const paciente = pacientes.value.find((item) => item._id === id)
-  return paciente
-    ? `${paciente.nomepac} ${paciente.apelpac}`
-    : "Paciente no disponible"
+  const paciente = pacientes.value.find((item) => String(item._id) === id)
+  if (paciente) {
+    return `${paciente.nomepac} ${paciente.apelpac}`
+  }
+
+  if (String(pacienteStore.idPaciente) === id) {
+    return `${pacienteStore.nomepac} ${pacienteStore.apelpac}`
+  }
+
+  return "Paciente no disponible"
 }
 
 // Resuelve el identificador de doctor a su nombre para mostrarlo en la tabla.
