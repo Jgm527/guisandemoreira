@@ -3,10 +3,10 @@ import axios from "axios"
 // Punto de entrada comun para las peticiones HTTP de citas.
 const API_URL = "http://localhost:3000/api/citas"
 
-// Devuelve todas las citas guardadas; propaga los errores HTTP para que la pantalla los muestre.
-export async function getCitas() {
-  // res es la respuesta HTTP completa; el modulo expone solo el cuerpo JSON.
-  const res = await axios.get(API_URL)
+// Devuelve las citas que coinciden con los filtros opcionales y propaga errores HTTP.
+export async function getCitas(filtros = {}) {
+  // Axios envia los identificadores como query params; si no hay filtros, lista todas.
+  const res = await axios.get(API_URL, { params: filtros })
   return res.data
 }
 

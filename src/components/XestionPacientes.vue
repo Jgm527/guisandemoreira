@@ -186,7 +186,22 @@
       </div>
     </form>
 
-    <h4>📋 Listaxe de pacientes</h4>
+    <div class="cabecera-informe">
+      <h4>📋 Listaxe de pacientes</h4>
+      <button
+        class="btn-informe"
+        type="button"
+        title="Exportar listado de pacientes a PDF"
+        aria-label="Exportar listado de pacientes a PDF"
+        :disabled="pacientes.length === 0"
+        @click="exportarPacientes"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <path d="M6 14h12v7H6zM18 12h.01" />
+        </svg>
+      </button>
+    </div>
 
     <!-- La tabla solo se muestra si hay pacientes guardados;
          en caso contrario se muestra el párrafo v-else.
@@ -268,6 +283,7 @@ import { ref, reactive, onMounted } from "vue";
 import { obtenerProvincias, obtenerMunicipios } from "../api/municipios.js";
 // Pinia: libreria oficial de Vue para el manejo del estado global de la aplicacion.
 import { usepacienteStore } from "../store/pacienteStore.js";
+import { generarPDF } from "../utils/pdf.js";
 // Operaciones de lectura y escritura de pacientes en el backend.
 import {
   getPacientes,
@@ -318,6 +334,24 @@ const pacienteStore = usepacienteStore();
 // Comparte el paciente seleccionado con otras pantallas mediante el store de Pinia.
 function seleccionarPaciente(paciente) {
   pacienteStore.seleccionarPaciente(paciente);
+}
+
+async function exportarPacientes() {
+  try {
+    await generarPDF({
+      titulo: "Listado de pacientes",
+      cabeceras: ["DNI", "Apellidos", "Nombre", "Móvil"],
+      filas: pacientes.value.map((paciente) => [
+        paciente.dnipac ?? "",
+        paciente.apelpac ?? "",
+        paciente.nomepac ?? "",
+        paciente.movilpac ?? "",
+      ]),
+      nombreArchivo: "listado_pacientes.pdf",
+    });
+  } catch (error) {
+    alertaError(mensaxeDoErro(error, "No se pudo generar el informe de pacientes."));
+  }
 }
 
 // onMounted es el punto de entrada para pedir los datos iniciales.

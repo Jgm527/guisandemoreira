@@ -181,6 +181,38 @@
     @apply mb-4 rounded bg-[#1b4965] px-3 py-2 font-semibold text-white;
   }
 
+  .cabecera-informe {
+    @apply mb-4 flex items-center justify-between gap-4 rounded bg-[#1b4965] px-3 py-2;
+  }
+
+  .cabecera-informe h4 {
+    @apply mb-0 flex-1 bg-transparent p-0;
+  }
+
+  .btn-informe {
+    @apply inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded border border-white/40 bg-white/10 p-2 text-white transition-colors duration-200;
+  }
+
+  .btn-informe svg,
+  .xestion-citas .citas-boton-informe svg {
+    @apply h-5 w-5;
+  }
+
+  .btn-informe:focus-visible {
+    @apply outline-2 outline-offset-2 outline-[#ffe66d];
+  }
+
+  .btn-informe:hover,
+  .xestion-citas .citas-boton-informe:hover {
+    @apply bg-white/20;
+  }
+
+  .btn-informe:disabled,
+  .btn-informe:disabled:hover,
+  .xestion-citas .citas-boton-informe:disabled {
+    @apply cursor-not-allowed bg-[#aaa];
+  }
+
   .xestion-doctores {
     @apply box-border w-full min-w-0 rounded-lg bg-white p-8 shadow-[0_2px_10px_rgba(0,0,0,0.05)];
   }
@@ -346,15 +378,10 @@
   }
 
   .xestion-citas .citas-boton-actualizar {
-    @apply mb-4 h-10 w-10 shrink-0 border-transparent bg-[#1b4965] p-0 text-white;
-  }
-
-  .xestion-citas .citas-boton-actualizar:hover {
-    @apply bg-[#153c54] text-white;
+    @apply shrink-0;
   }
 
   .xestion-citas .citas-boton-secundario:hover,
-  .xestion-citas .citas-boton-actualizar:hover,
   .xestion-citas .citas-boton-accion:hover {
     @apply bg-[#f0f0f0];
   }
@@ -367,15 +394,31 @@
   }
 
   .xestion-citas .citas-cabecera-lista {
-    @apply flex items-center justify-between gap-4;
+    @apply mb-4 flex items-center justify-between gap-2 rounded bg-[#1b4965] px-3 py-2;
   }
 
   .xestion-citas .citas-cabecera-lista h4 {
-    @apply mb-4 flex-1;
+    @apply mb-0 flex-1 bg-transparent p-0;
+  }
+
+  .xestion-citas .citas-boton-informe {
+    @apply inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded border border-white/40 bg-white/10 p-2 text-white transition-colors;
+  }
+
+  .xestion-citas .citas-boton-informe:focus-visible {
+    @apply outline-2 outline-offset-2 outline-[#1b4965];
+  }
+
+  .xestion-citas .citas-boton-informe:disabled {
+    @apply cursor-not-allowed bg-[#aaa];
+  }
+
+  .xestion-citas .citas-boton-actualizar:hover {
+    @apply bg-white/20;
   }
 
   .xestion-citas .citas-cabecera-lista {
-    @apply items-start;
+    @apply items-center;
   }
 
   .xestion-citas .citas-tabla-wrapper {

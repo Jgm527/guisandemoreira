@@ -175,7 +175,7 @@
             v-else
             class="citas-boton-secundario"
             type="button"
-            @click="limpiarFormulario"
+            @click="limpiarSeleccion"
           >
             Limpiar
           </button>
@@ -184,9 +184,22 @@
 
       <div class="citas-cabecera-lista">
         <h4>📋 Listado de citas</h4>
+        <button
+          class="citas-boton-informe"
+          type="button"
+          title="Exportar listado de citas a PDF"
+          aria-label="Exportar listado de citas a PDF"
+          :disabled="cargando || citas.length === 0"
+          @click="exportarCitas"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <path d="M6 14h12v7H6zM18 12h.01" />
+          </svg>
+        </button>
         <!-- Actualiza las citas del paciente seleccionado y el catalogo de doctores. -->
         <button
-          class="citas-boton-actualizar"
+          class="citas-boton-informe citas-boton-actualizar"
           type="button"
           title="Actualizar listado"
           aria-label="Actualizar listado"
@@ -291,6 +304,7 @@ import { useDoctorStore } from "../store/doctorStore.js";
 import { deleteCita, getCitas, saveCita, updateCita } from "../api/citas.js"
 import { getDoctores } from "../api/doctores.js"
 import { getPacientes } from "../api/pacientes.js"
+import { generarPDF } from "../utils/pdf.js"
 import {
   alertaConfirmacion,
   alertaError,
@@ -371,7 +385,7 @@ async function cargarDatos() {
     // Los catalogos permiten mostrar el nombre de la otra persona aunque solo
     // se haya seleccionado paciente o doctor en su pestaña.
     const [listaCitas, listaPacientes, listaDoctores] = await Promise.all([
-      getCitas(),
+      getCitas({ pacienteId: idPaciente, doctorId: idDoctor }),
       getPacientes(),
       getDoctores()
     ])
@@ -384,6 +398,7 @@ async function cargarDatos() {
       return
     }
 
+    // Verifica tambien en el cliente los filtros, por si el backend activo aun no se reinicio.
     citas.value = listaCitas.filter((item) =>
       (!idPaciente || idRelacionado(item.pacienteId) === String(idPaciente)) &&
       (!idDoctor || idRelacionado(item.doctorId) === String(idDoctor))
@@ -394,6 +409,49 @@ async function cargarDatos() {
     alertaError(mensajeError(error, "No se pudieron cargar las citas, pacientes y doctores."))
   } finally {
     cargando.value = false
+  }
+}
+
+async function exportarCitas() {
+  const paciente = pacientes.value.find(
+    (item) => String(item._id) === String(pacienteStore.idPaciente)
+  )
+  const doctor = doctores.value.find(
+    (item) => String(item._id) === String(doctorStore.idDoctor)
+  )
+  const filtros = []
+
+  if (pacienteStore.idPaciente) {
+    const nombre = paciente
+      ? `${paciente.nomepac} ${paciente.apelpac}`
+      : `${pacienteStore.nomepac} ${pacienteStore.apelpac}`
+    filtros.push(`Paciente: ${nombre}`)
+  }
+  if (doctorStore.idDoctor) {
+    const nombre = doctor
+      ? `${doctor.nomedoc} ${doctor.apeldoc}`
+      : `${doctorStore.nomedoc} ${doctorStore.apeldoc}`
+    filtros.push(`Doctor: ${nombre}`)
+  }
+
+  try {
+    await generarPDF({
+      titulo: "Informe de citas",
+      descripcion: filtros.join(" | "),
+      cabeceras: ["Fecha", "Hora", "Paciente", "Doctor", "Motivo", "Estado"],
+      filas: citas.value.map((item) => [
+        item.fecha ?? "",
+        item.hora ?? "",
+        nombrePaciente(item.pacienteId),
+        nombreDoctor(item.doctorId),
+        item.motivo ?? "",
+        etiquetaEstado(item.estado),
+      ]),
+      nombreArchivo: "informe_citas.pdf",
+      orientacion: "landscape",
+    })
+  } catch (error) {
+    alertaError(mensajeError(error, "No se pudo generar el informe de citas."))
   }
 }
 
@@ -475,6 +533,13 @@ async function eliminarCita(item) {
 function limpiarFormulario() {
   Object.assign(cita, citaVacia())
   editando.value = false
+}
+
+// Limpia el formulario y las selecciones compartidas de paciente y doctor.
+function limpiarSeleccion() {
+  limpiarFormulario()
+  pacienteStore.limpiarPaciente()
+  doctorStore.limpiarDoctor()
 }
 
 // Busca el paciente relacionado en el catálogo, con el store como respaldo.

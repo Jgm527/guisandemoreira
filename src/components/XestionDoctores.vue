@@ -135,7 +135,22 @@
     </form>
 
     <!-- Tabla con las acciones disponibles para cada doctor guardado. -->
-    <h4>Listaxe de doctores</h4>
+    <div class="cabecera-informe">
+      <h4>Listaxe de doctores</h4>
+      <button
+        class="btn-informe"
+        type="button"
+        title="Exportar listado de doctores a PDF"
+        aria-label="Exportar listado de doctores a PDF"
+        :disabled="doctores.length === 0"
+        @click="exportarDoctores"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <path d="M6 14h12v7H6zM18 12h.01" />
+        </svg>
+      </button>
+    </div>
 
     <!-- doctores se rellena con cargarDoctores(); v-for crea una fila por documento. -->
     <div v-if="doctores.length" class="tabla-doctores">
@@ -206,6 +221,7 @@ import {
 import { obtenerEspecialidades } from "../api/especialidades.js";
 // Store compartido con la pantalla de citas.
 import { useDoctorStore } from "../store/doctorStore.js";
+import { generarPDF } from "../utils/pdf.js";
 // Dialogos reutilizables para confirmar acciones y comunicar resultados.
 import {
   alertaConfirmacion,
@@ -253,6 +269,26 @@ onMounted(async () => {
 // Guarda el doctor seleccionado para que la pantalla de citas pueda usar su ID.
 function seleccionarDoctor(doctor) {
   doctorStore.seleccionarDoctor(doctor);
+}
+
+async function exportarDoctores() {
+  try {
+    await generarPDF({
+      titulo: "Listado de doctores",
+      cabeceras: ["ID", "Apellidos", "Nombre", "Móvil", "Especialidad"],
+      filas: doctores.value.map((doctor) => [
+        doctor._id ?? "",
+        doctor.apeldoc ?? "",
+        doctor.nomedoc ?? "",
+        doctor.movildoc ?? "",
+        doctor.especdoc ?? "",
+      ]),
+      nombreArchivo: "listado_doctores.pdf",
+      orientacion: "landscape",
+    });
+  } catch (error) {
+    alertaError(mensaxeDoErro(error, "No se pudo generar el informe de doctores."));
+  }
 }
 
 // Obtiene el catalogo del backend; el array vacio deja el selector inhabilitado si falla.

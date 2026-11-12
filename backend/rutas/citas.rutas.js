@@ -41,13 +41,26 @@ async function validarRelaciones(datos) {
     return ""
 }
 
-// GET /api/citas: devuelve las citas ordenadas cronologicamente.
+// GET /api/citas: filtra por las relaciones recibidas y ordena cronologicamente.
 router.get("/", async (req, res) => {
     try {
-        // lean() devuelve objetos simples y el orden facilita mostrar las proximas citas primero.
-        const citas = await Cita.find().sort({ fecha: 1, hora: 1 }).lean()
+        // Los filtros simultaneos se combinan con AND para devolver la interseccion.
+        const filtros = {}
+        if (req.query.pacienteId) {
+            filtros.pacienteId = req.query.pacienteId
+        }
+        if (req.query.doctorId) {
+            filtros.doctorId = req.query.doctorId
+        }
+
+        // lean() devuelve objetos simples y prioriza las proximas citas.
+        const citas = await Cita.find(filtros).sort({ fecha: 1, hora: 1 }).lean()
         res.json(citas)
     } catch (error) {
+        if (error.name === "CastError") {
+            return res.status(400).json({ mensaje: "El ID de paciente o doctor no es válido" })
+        }
+
         console.error("Error al listar las citas:", error)
         res.status(500).json({ mensaje: "Error al listar las citas" })
     }
