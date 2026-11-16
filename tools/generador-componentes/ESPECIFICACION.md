@@ -6,8 +6,8 @@ Este documento describe qué deberá hacer el futuro generador de componentes.
 **No es el generador y no crea ni modifica pantallas de la aplicación.** La
 implementación solo empezará después de revisar y aprobar esta especificación.
 
-La herramienta se quiere utilizar como ayuda local durante el examen. No debe depender de Internet, de
-IA ni de servicios externos.
+La herramienta se quiere utilizar como ayuda local durante el examen. No debe
+depender de Internet, de IA ni de servicios externos durante su uso.
 
 ## 2. Objetivo
 
@@ -27,47 +27,62 @@ La herramienta debe ayudar a contestar estas preguntas:
 - ¿Qué partes debo copiar y en qué archivos del proyecto?
 - ¿Qué hace cada archivo y por qué forma parte de la solución?
 
-El resultado es **código compatible** con el proyecto de veu y sus dependencias, una
-**base funcional y explicada para adaptar**, no un sistema
-que entienda peticiones libres ni que tome decisiones de negocio por el usuario.
-La persona selecciona opciones y proporciona los datos mediante preguntas
-estructuradas.
+El resultado es código nuevo que debe encajar con la estructura y las
+dependencias del proyecto y funcionar al integrarlo siguiendo las instrucciones.
+La herramienta no entiende peticiones libres ni toma decisiones de negocio por
+el usuario: genera código mediante plantillas y reglas explícitas a partir de
+las respuestas estructuradas del formulario, sin IA.
 
 ## 3. Principios obligatorios
 
-1. **Offline:** no realizar peticiones a Internet ni a servicios de IA.
-2. **Sin dependencias externas:** Las dependencias que usemos se han de descargar localmente
-3. **Seguro por defecto:** no modificar `src/` ni `backend/` ni ningun archivo original del proyecto
+1. **Offline:** durante la ejecución no realizar peticiones a Internet ni a
+   servicios de IA. Las dependencias necesarias pueden instalarse o descargarse
+   previamente (por ejemplo, con `npm install`) y quedar disponibles en local.
+2. **Sin servicios externos:** no utilizar servicios remotos; el generador debe
+   poder usarse sin conexión una vez instaladas sus dependencias.
+3. **Seguro por defecto:** no modificar `src/`, `backend/` ni ningún archivo
+   original del proyecto. Las salidas se limitan a la carpeta `salidas/`.
 4. **Explicativo:** cada archivo y bloque generado debe explicar qué es, para
    qué sirve y dónde va.
 5. **Fiel al repositorio:** generar únicamente patrones fundamentados en los
    componentes, API, modelos, rutas, stores y utilidades existentes.
 6. **Honesto ante límites:** si una petición no está soportada, indicarlo
    claramente. No generar una función que parezca implementada pero no funcione.
-7. **Copiable:** mostrar los códigos en la página y guardarlos en archivos para
-   copiar manualmente al proyecto.
+7. **Copiable:** mostrar todos los códigos generados en la página HTML,
+   permitir copiarlos desde allí y guardarlos también en archivos para copiar
+   manualmente al proyecto.
 8. **Repetible:** guardar las respuestas como configuración para poder revisar
    o regenerar la propuesta más adelante.
 9. **Comprensible para principiantes:** usar nombres consistentes y explicar
    expresamente términos como modelo, API, ruta, store, colección y referencia.
-10. **Sin sobrescrituras silenciosas:** si ya existe una carpeta de salida para
-    el mismo nombre, avisar y pedir una acción explícita.
+10. **Regeneración:** si ya existe una salida con el mismo nombre, la nueva
+    generación la sobrescribe. La interfaz debe indicar claramente qué salida
+    se reemplazará.
 
 ## 4. Ubicación y forma de ejecución
 
 - Carpeta prevista: `tools/generador-componentes/`.
 - Interfaz prevista: formulario HTML local.
 - Un servidor pequeño de Node.js servirá la página y procesará la solicitud de
-  generación.
-- El servidor usará módulos nativos de Node (por ejemplo, `http`, `fs` y
-  `path`) y no instalará dependencias.
+  generación. Debe escuchar únicamente en `127.0.0.1` (accesible desde el mismo
+  equipo mediante `localhost`); no debe exponerse a la red local ni a Internet.
+- El generador puede usar módulos nativos de Node o dependencias instaladas
+  localmente. Las dependencias pueden descargarse previamente y con conexión,
+  pero durante el uso de la herramienta no se harán solicitudes de red.
 - La forma prevista de iniciar el servidor será un comando Node documentado en
   esta carpeta. No se debe cambiar `package.json` de la aplicación sin acordar
   expresamente ese cambio.
 - Las salidas irán a
   `tools/generador-componentes/salidas/<nombre-seguro>/`.
-- El generador puede revisar los componentes, modelos de backend y demás del proyecto, leer si, escribir no.
-- El generador si encuentra modelos o componentes iguales a los solicitados lo mostrará
+- El generador puede leer y revisar los componentes, modelos de backend y demás
+  archivos del proyecto, pero no escribir ni modificarlos.
+- Para detectar código existente, comparará la configuración con los archivos y
+  patrones conocidos del repositorio. Mostrará las coincidencias y pedirá que la
+  persona confirme si debe reutilizarlos. Si confirma, generará solo lo que
+  falte y advertirá claramente qué piezas ya existen y qué cambios manuales se
+  necesitan.
+- La generación se basará en plantillas y reglas explícitas; no usará IA ni
+  intentará deducir automáticamente requisitos no proporcionados.
 
 La carpeta `salidas/` contendrá resultados de uso, no plantillas fuente del
 generador. Las plantillas fuente y la lógica de generación permanecerán en la
@@ -75,7 +90,8 @@ carpeta de la herramienta.
 
 ## 5. Tipos de componente disponibles
 
-El formulario debe permitir seleccionar uno de estos tipos o cualquiera que se haya creado en el proyecto:
+El formulario debe permitir seleccionar uno de estos tipos y, cuando se
+detecten, los componentes o patrones existentes que se puedan reutilizar:
 
 | Tipo | Resultado esperado |
 |---|---|
@@ -168,7 +184,12 @@ backend, API y componente.
 
 Para un recurso existente, presentar las opciones conocidas y explicar qué
 archivos mirar para confirmar sus nombres de campos, operaciones e
-identificador.
+identificador. Si la herramienta encuentra un modelo, componente, API, ruta o
+store que coincida con lo solicitado, debe mostrar la coincidencia y pedir
+confirmación antes de considerarla reutilizable. Tras la confirmación, debe
+generar únicamente las piezas que falten y documentar las piezas existentes y
+cualquier modificación manual requerida. No modificará automáticamente esos
+archivos.
 
 ### Paso 3: definir campos
 
@@ -181,7 +202,7 @@ Se podrá añadir cualquier cantidad de campos. Para cada campo, preguntar:
 | Tipo | Tipo de dato y control visual que representa. |
 | Obligatorio | Si el formulario debe exigir el valor y Mongoose debe requerirlo. |
 | Valor inicial | Valor sugerido para el formulario y, si corresponde, valor por defecto en el esquema. |
-| Validación | Restricciones comunes adecuadas al tipo del campo. |
+| Validación | Restricciones configurables y adecuadas al tipo del campo. |
 | Formulario | Si aparece como control para crear/editar. |
 | Listado/tabla | Si se muestra como columna o dato de la lista. |
 | Búsqueda | Si se incluye en el texto/localizador de búsqueda. |
@@ -199,6 +220,23 @@ Tipos iniciales que debe poder describir:
 - radio con opciones fijas,
 - selector con opciones fijas,
 - selector alimentado por un catálogo/API.
+
+En el formulario inicial se podrán configurar las restricciones aplicables a
+cada campo. Como mínimo:
+
+- texto y texto largo: longitud mínima y máxima, expresión regular y mensaje de
+  validación;
+- número: valor mínimo y máximo;
+- fecha: fecha mínima y máxima;
+- email: formato de email y, cuando corresponda, longitud mínima y máxima;
+- selectores, radio y booleanos: opciones o valores permitidos.
+
+El generador aplicará las restricciones compatibles tanto en el formulario como
+en el esquema o las rutas del backend que genere. Si una restricción no se puede
+representar de forma equivalente en una capa, debe indicarlo en el resultado y
+en `INSTRUCCIONES.md`. Debe validar la configuración de estas reglas antes de
+generar (por ejemplo, que el mínimo no supere al máximo y que la expresión
+regular tenga un formato válido).
 
 No se incluirá subida real de archivos en esta versión. La plantilla existente
 solo muestra cómo detectar un fichero elegido; no hay una ruta backend de subida
@@ -323,9 +361,13 @@ comentarios. El store solo se genera si se ha solicitado compartir datos con
 Pinia. Los modelos y routers solo se generan para una entidad nueva. Los demás
 archivos dependen del tipo de componente y de su origen de datos.
 
-La página de generación también mostrará bloques de código copiables, o bien
-una forma clara de abrir cada archivo generado. Debe quedar claro qué archivos
-son nuevos y qué fragmentos se añaden manualmente a archivos existentes.
+La página HTML debe mostrar el contenido completo de cada archivo generado en
+bloques diferenciados y copiables, además de guardarlo en los archivos de la
+carpeta de salida. Debe quedar claro qué archivos son nuevos, cuáles se
+reutilizan y qué fragmentos se añaden manualmente a archivos existentes.
+Al regenerar una salida con el mismo nombre, se reemplazará su contenido; la
+interfaz debe indicar cuál es la carpeta que se sobrescribirá. Esta escritura
+se limita siempre a `tools/generador-componentes/salidas/`.
 
 ## 10. Contenido de `INSTRUCCIONES.md`
 
@@ -353,26 +395,33 @@ Cada resultado debe incluir una guía propia, en lenguaje sencillo, que explique
 Los fragmentos para archivos existentes serán instrucciones de inserción, no
 versiones completas que puedan borrar código del proyecto.
 
-## 11. Funcionamiento seguro de la generación
+## 11. Límites de ejecución y escritura
 
 - Aceptar solo nombres/path seguros; no permitir que una respuesta del formulario
   escriba fuera de `salidas/<nombre-seguro>/`.
+- El servidor solo escuchará en `127.0.0.1`, para uso desde el mismo equipo. No
+  se requiere autenticación ni protección para un servicio expuesto a otros
+  equipos, ya que no debe exponerse a la red.
 - Validar que nombres técnicos, rutas, opciones y campos no estén vacíos ni
   tengan formatos incompatibles con el código que se va a generar.
 - Mostrar errores de validación junto a la pregunta correspondiente.
 - Si la configuración no permite una salida completa, detener la generación y
   explicar qué falta.
 - No tratar una salida incompleta como éxito.
-- No sobrescribir una generación anterior sin confirmación.
+- Si ya existe una salida con el mismo nombre, sobrescribirla e informar de ello
+  claramente antes de completar la generación.
 - Mantener las salidas de práctica separadas del código activo de la aplicación.
 - No ejecutar automáticamente código generado.
 - No insertar datos personales o credenciales reales en ejemplos.
+- Las rutas del proyecto y de `salidas/` se resolverán con respecto a la
+  ubicación de la herramienta, no al directorio desde el que se inicia Node.
 
 ## 12. Criterios de aceptación del futuro generador
 
 La herramienta estará lista para una primera entrega cuando:
 
-1. Se pueda abrir sin Internet y sin instalar dependencias adicionales.
+1. Se pueda utilizar sin conexión a Internet, una vez instaladas o descargadas
+   localmente las dependencias necesarias.
 2. El formulario permita crear una configuración de componente completa y
    comprensible.
 3. Se pueda generar al menos un CRUD de entidad nueva con modelo, rutas, API,
@@ -385,15 +434,23 @@ La herramienta estará lista para una primera entrega cuando:
    usuario.
 7. Las relaciones soportadas usen los patrones locales documentados de MongoDB
    y Pinia.
-8. El resultado incluya código copiable en pantalla y archivos en la carpeta de
-   salida.
+8. El resultado incluya el código completo y copiable en la página HTML, además
+   de los archivos correspondientes en la carpeta de salida.
 9. La guía generada explique qué copiar, dónde y por qué.
-10. Se validen entradas y no haya sobrescrituras silenciosas ni escritura fuera
-    de la carpeta de salida.
-11. Un ejemplo de salida pueda copiarse al proyecto y pasar `npm run build`,
-    además de indicar qué no valida el build.
+10. Se validen las entradas, se informe cuando se sobrescriba una salida y no
+    se escriba fuera de la carpeta de salida.
+11. Las salidas y las instrucciones sean suficientemente coherentes con el
+    proyecto para que, al copiar manualmente los archivos y fragmentos
+    indicados, la persona pueda levantar la aplicación sin tener que corregir
+    errores generados por incompatibilidades del generador.
 12. Las partes no soportadas queden señaladas con claridad, sin producir una
     implementación que finja funcionar.
+
+La validación de la integración será manual: la persona copiará el código al
+proyecto y tratará de levantarlo y probar las funciones solicitadas. El
+generador no ejecutará `npm run build`, pruebas automatizadas ni el código
+generado. Las instrucciones deben recomendar las comprobaciones manuales
+pertinentes y distinguirlas de lo que comprueba `npm run build`.
 
 ## 13. Plan recomendado para implementarlo después de aprobar la especificación
 
@@ -402,8 +459,8 @@ La herramienta estará lista para una primera entrega cuando:
 3. Implementar el formulario y validación de la configuración.
 4. Implementar primero el generador CRUD de entidad nueva.
 5. Añadir guía explicativa y fragmentos manuales de registro.
-6. Probar una generación de ejemplo copiándola a una ubicación temporal de
-   trabajo y ejecutando la validación del proyecto.
+6. Revisar manualmente una generación de ejemplo, copiarla siguiendo las
+   instrucciones a un proyecto de prueba y levantar/probar la aplicación.
 7. Añadir el uso de recursos existentes.
 8. Añadir los tipos restantes de pantalla.
 9. Añadir, uno por uno, catálogos, Pinia, alertas, filtros y PDF.
@@ -432,4 +489,3 @@ servirá para practicar antes del examen.
 - `backend/rutas/citas.rutas.js`: validación de referencias entre documentos.
 - `src/utils/alertas.js` y `src/utils/pdf.js`: utilidades reutilizables para
   mensajes y exportación.
-
