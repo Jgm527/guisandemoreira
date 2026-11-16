@@ -2,9 +2,12 @@
 
 ## 1. Estado del documento
 
-Este documento describe qué deberá hacer el futuro generador de componentes.
-**No es el generador y no crea ni modifica pantallas de la aplicación.** La
-implementación solo empezará después de revisar y aprobar esta especificación.
+Este documento recoge el alcance objetivo del generador local. La primera
+entrega ya implementa un subconjunto explícito: servidor local, formulario
+offline, validación, generación CRUD de entidad nueva, vista previa, escritura
+limitada a `salidas/`, copia de archivos y configuración reutilizable. Las
+funciones no indicadas como implementadas siguen pendientes y la herramienta
+debe comunicarlas sin simular que están disponibles.
 
 La herramienta se quiere utilizar como ayuda local durante el examen. No debe
 depender de Internet, de IA ni de servicios externos durante su uso.

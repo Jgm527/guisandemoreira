@@ -1,0 +1,294 @@
+import { createServer } from "node:http"
+import { randomUUID } from "node:crypto"
+import { access, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+import { generateFiles, validateConfiguration } from "./generador.js"
+
+const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
+const PROJECT_ROOT = path.resolve(TOOL_ROOT, "..", "..")
+const OUTPUT_ROOT = path.resolve(TOOL_ROOT, "salidas")
+const HOST = "127.0.0.1"
+const PORT = Number(process.env.COMPONENT_GENERATOR_PORT || 4179)
+const MAX_BODY_BYTES = 1_000_000
+
+const RESOURCE_REFERENCES = [
+  {
+    name: "Pacientes",
+    files: ["src/api/pacientes.js", "backend/modelos/Paciente.js", "backend/rutas/pacientes.rutas.js"],
+  },
+  {
+    name: "Doctores",
+    files: ["src/api/doctores.js", "backend/modelos/Doctor.js", "backend/rutas/doctores.rutas.js"],
+  },
+  {
+    name: "Citas",
+    files: ["src/api/citas.js", "backend/modelos/Cita.js", "backend/rutas/citas.rutas.js"],
+  },
+  {
+    name: "Especialidades",
+    files: ["src/api/especialidades.js", "backend/data/especialidades.json"],
+  },
+  {
+    name: "Municipios",
+    files: ["src/api/municipios.js", "backend/data/municipios.json"],
+  },
+]
+
+function send(response, status, body, contentType = "application/json; charset=utf-8") {
+  response.writeHead(status, {
+    "Content-Type": contentType,
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+    "Content-Security-Policy": "default-src 'self'; connect-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  })
+  response.end(contentType.startsWith("application/json") ? JSON.stringify(body) : body)
+}
+
+async function readJson(request) {
+  let size = 0
+  const chunks = []
+  for await (const chunk of request) {
+    size += chunk.length
+    if (size > MAX_BODY_BYTES) {
+      const error = new Error("La solicitud supera el tamaño permitido.")
+      error.statusCode = 413
+      throw error
+    }
+    chunks.push(chunk)
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"))
+  } catch {
+    const error = new Error("El cuerpo de la solicitud no contiene JSON válido.")
+    error.statusCode = 400
+    throw error
+  }
+}
+
+function getOutputPath(slug) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
+    throw new Error("El nombre de salida calculado no es seguro.")
+  }
+  const target = path.resolve(OUTPUT_ROOT, slug)
+  if (path.dirname(target) !== OUTPUT_ROOT) {
+    throw new Error("La salida solicitada queda fuera de la carpeta permitida.")
+  }
+  return target
+}
+
+async function ensureOutputRoot() {
+  await mkdir(OUTPUT_ROOT, { recursive: true })
+  const info = await lstat(OUTPUT_ROOT)
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    throw new Error("La carpeta salidas debe ser una carpeta local normal, no un enlace simbólico.")
+  }
+}
+
+async function inspectOutput(target) {
+  try {
+    const info = await lstat(target)
+    if (!info.isDirectory() || info.isSymbolicLink()) {
+      throw new Error("La salida existente no es una carpeta segura; no se modificó.")
+    }
+    return true
+  } catch (error) {
+    if (error.code === "ENOENT") return false
+    throw error
+  }
+}
+
+async function findProjectCollisions(files, config) {
+  const matches = []
+  for (const relativePath of Object.keys(files)) {
+    if (!relativePath.startsWith("backend/") && !relativePath.startsWith("src/")) continue
+    const target = path.resolve(PROJECT_ROOT, relativePath)
+    try {
+      await access(target)
+      matches.push(relativePath)
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
+    }
+  }
+
+  const routerPath = path.join(PROJECT_ROOT, "src", "router", "index.js")
+  try {
+    const routerSource = await readFile(routerPath, "utf8")
+    const routePattern = /\bpath\s*:\s*(["'])(.*?)\1/g
+    for (const match of routerSource.matchAll(routePattern)) {
+      if (match[2] === config.screen.route) {
+        matches.push(`src/router/index.js (ya registra la ruta ${config.screen.route})`)
+        break
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error
+  }
+
+  const backendPath = path.join(PROJECT_ROOT, "backend", "server.js")
+  try {
+    const backendSource = await readFile(backendPath, "utf8")
+    const endpointPattern = /\bapp\.(?:use|get|post|put|delete)\s*\(\s*(["'`])([^"'`]+)\1/g
+    for (const match of backendSource.matchAll(endpointPattern)) {
+      const currentPath = match[2].replace(/\/+$/, "")
+      const proposedPath = config.entity.apiPath.replace(/\/+$/, "")
+      if (currentPath === proposedPath ||
+          currentPath.startsWith(`${proposedPath}/`) ||
+          proposedPath.startsWith(`${currentPath}/`)) {
+        matches.push(`backend/server.js (la ruta ${proposedPath} se solapa con ${currentPath})`)
+        break
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error
+  }
+  return matches
+}
+
+async function projectStatus() {
+  const resources = []
+  for (const resource of RESOURCE_REFERENCES) {
+    const files = []
+    for (const relativePath of resource.files) {
+      try {
+        await access(path.resolve(PROJECT_ROOT, relativePath))
+        files.push(relativePath)
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error
+      }
+    }
+    if (files.length) resources.push({ name: resource.name, files })
+  }
+
+  let outputs = []
+  try {
+    outputs = (await readdir(OUTPUT_ROOT, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name))
+      .map((entry) => entry.name)
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error
+  }
+  return { resources, outputs }
+}
+
+async function handlePreview(request, response) {
+  const input = await readJson(request)
+  const { errors } = validateConfiguration(input)
+  if (errors.length) {
+    return send(response, 400, { message: "Revisa los datos del formulario.", errors })
+  }
+
+  const generated = generateFiles(input)
+  const target = getOutputPath(generated.outputSlug)
+  const exists = await inspectOutput(target)
+  const collisions = await findProjectCollisions(generated.files, generated.config)
+  return send(response, 200, {
+    outputSlug: generated.outputSlug,
+    outputPath: path.relative(PROJECT_ROOT, target).split(path.sep).join("/"),
+    exists,
+    collisions,
+    files: Object.keys(generated.files),
+  })
+}
+
+async function handleGenerate(request, response) {
+  const input = await readJson(request)
+  const { errors } = validateConfiguration(input)
+  if (errors.length) {
+    return send(response, 400, { message: "Revisa los datos del formulario.", errors })
+  }
+
+  const generated = generateFiles(input)
+  const target = getOutputPath(generated.outputSlug)
+  await ensureOutputRoot()
+  const exists = await inspectOutput(target)
+  if (exists && input.overwriteConfirmed !== true) {
+    return send(response, 409, {
+      message: "La salida ya existe. Confirma su reemplazo antes de volver a generar.",
+      overwriteRequired: true,
+    })
+  }
+
+  const collisions = await findProjectCollisions(generated.files, generated.config)
+  if (collisions.length) {
+    return send(response, 409, {
+      message: "Algunos archivos coinciden con archivos existentes del proyecto. La reutilización de recursos aún no está disponible; se canceló para evitar confusiones.",
+      collisions,
+    })
+  }
+
+  const temporaryDirectory = await mkdtemp(path.join(OUTPUT_ROOT, `.generador-${randomUUID()}-`))
+  try {
+    for (const [relativePath, contents] of Object.entries(generated.files)) {
+      const destination = path.resolve(temporaryDirectory, relativePath)
+      if (!destination.startsWith(`${temporaryDirectory}${path.sep}`)) {
+        throw new Error("Un archivo generado intenta salir de la carpeta temporal.")
+      }
+      await mkdir(path.dirname(destination), { recursive: true })
+      await writeFile(destination, contents, { encoding: "utf8", flag: "wx" })
+    }
+
+    if (exists) await rm(target, { recursive: true, force: false })
+    await rename(temporaryDirectory, target)
+  } catch (error) {
+    await rm(temporaryDirectory, { recursive: true, force: true })
+    throw error
+  }
+
+  return send(response, 201, {
+    message: "Generación completada.",
+    outputSlug: generated.outputSlug,
+    outputPath: path.relative(PROJECT_ROOT, target).split(path.sep).join("/"),
+    files: Object.entries(generated.files).map(([filePath, contents]) => ({ path: filePath, contents })),
+    configuration: generated.config,
+  })
+}
+
+function staticFile(response, file, contentType) {
+  return readFile(path.join(TOOL_ROOT, "public", file))
+    .then((contents) => send(response, 200, contents.toString("utf8"), contentType))
+    .catch((error) => {
+      console.error(`No se pudo leer la página local (${file}):`, error)
+      send(response, 500, "No se pudo cargar un archivo de la herramienta.", "text/plain; charset=utf-8")
+    })
+}
+
+const server = createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url, `http://${HOST}:${PORT}`)
+    if (request.method === "GET" && url.pathname === "/") {
+      return await staticFile(response, "index.html", "text/html; charset=utf-8")
+    }
+    if (request.method === "GET" && url.pathname === "/app.js") {
+      return await staticFile(response, "app.js", "text/javascript; charset=utf-8")
+    }
+    if (request.method === "GET" && url.pathname === "/styles.css") {
+      return await staticFile(response, "styles.css", "text/css; charset=utf-8")
+    }
+    if (request.method === "GET" && url.pathname === "/api/status") {
+      return send(response, 200, await projectStatus())
+    }
+    if (request.method === "POST" && url.pathname === "/api/preview") {
+      return await handlePreview(request, response)
+    }
+    if (request.method === "POST" && url.pathname === "/api/generate") {
+      return await handleGenerate(request, response)
+    }
+    send(response, 404, { message: "No se encontró esa ruta." })
+  } catch (error) {
+    if (error.statusCode) return send(response, error.statusCode, { message: error.message })
+    console.error("Error en el generador local:", error)
+    send(response, 500, { message: error.message || "Error interno del generador." })
+  }
+})
+
+server.on("error", (error) => {
+  console.error(`No se pudo iniciar el generador en http://${HOST}:${PORT}:`, error.message)
+  process.exitCode = 1
+})
+
+server.listen(PORT, HOST, () => {
+  console.log(`Generador de componentes disponible en http://${HOST}:${PORT}`)
+  console.log("El servidor escucha solo en este equipo; cierra el proceso con Ctrl+C al terminar.")
+})

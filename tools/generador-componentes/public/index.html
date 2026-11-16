@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Generador local de componentes</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <p class="eyebrow">Herramienta local · sin IA · sin conexión externa</p>
+        <h1>Generador de componentes</h1>
+        <p class="intro">Describe una pantalla CRUD y obtén archivos explicados para integrar manualmente en este proyecto.</p>
+        <div id="resource-notice" class="notice notice-info" role="status">
+          Comprobando los patrones que existen en este proyecto...
+        </div>
+      </header>
+
+      <nav class="step-nav" aria-label="Pasos del formulario">
+        <button type="button" class="step-link is-active" data-step-link="0">1. Pantalla</button>
+        <button type="button" class="step-link" data-step-link="1">2. Entidad y campos</button>
+        <button type="button" class="step-link" data-step-link="2">3. Operaciones</button>
+        <button type="button" class="step-link" data-step-link="3">4. Revisar y generar</button>
+      </nav>
+
+      <form id="generator-form" novalidate>
+        <section class="step-panel" data-step="0">
+          <div class="section-heading">
+            <p class="eyebrow">Paso 1 de 4</p>
+            <h2>¿Qué pantalla quieres crear?</h2>
+            <p>El nombre técnico se usa para formar el archivo Vue. La ruta es la dirección que se abrirá en el navegador.</p>
+          </div>
+          <label class="field">
+            <span>Tipo de pantalla</span>
+            <select name="screenType" aria-describedby="type-help">
+              <option value="CRUD">CRUD (formulario y/o listado)</option>
+              <option value="Listado" disabled>Listado — próximamente</option>
+              <option value="Detalle" disabled>Detalle — próximamente</option>
+              <option value="Formulario" disabled>Formulario — próximamente</option>
+              <option value="Relacionado" disabled>Relacionado — próximamente</option>
+            </select>
+            <small id="type-help">Esta primera entrega genera CRUD para una entidad nueva.</small>
+          </label>
+          <div class="form-grid">
+            <label class="field">
+              <span>Nombre visible</span>
+              <input name="screenTitle" required value="Gestión de tareas" placeholder="Ej.: Gestión de tareas">
+              <small>Es el título que verá la persona usuaria.</small>
+            </label>
+            <label class="field">
+              <span>Nombre técnico del componente</span>
+              <input name="screenComponent" required pattern="[A-Z][A-Za-z0-9]*" value="GestionTareas" placeholder="GestionTareas">
+              <small>PascalCase, sin espacios; se propone el archivo GestionTareas.vue.</small>
+            </label>
+            <label class="field">
+              <span>Ruta del navegador</span>
+              <input name="screenRoute" required value="/gestion-tareas" placeholder="/gestion-tareas">
+              <small>Empieza por /. No debe coincidir con una ruta que ya use el proyecto.</small>
+            </label>
+            <label class="field">
+              <span>Texto del enlace del menú (opcional)</span>
+              <input name="menuLabel" value="Tareas" placeholder="Ej.: Tareas">
+              <small>La guía incluirá un fragmento para añadirlo manualmente al menú.</small>
+            </label>
+          </div>
+          <div class="step-actions">
+            <span></span>
+            <button type="button" class="button button-primary" data-next>Continuar</button>
+          </div>
+        </section>
+
+        <section class="step-panel" data-step="1" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Paso 2 de 4</p>
+            <h2>Define la entidad y sus campos</h2>
+            <p>Una entidad es el tipo de dato que guardarás. Esta versión crea una colección nueva y usa el identificador automático <code>_id</code> de MongoDB.</p>
+          </div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Nombre singular de la entidad</span>
+              <input name="entitySingular" required pattern="[A-Z][A-Za-z0-9]*" value="Tarea" placeholder="Tarea">
+            </label>
+            <label class="field">
+              <span>Nombre plural / colección</span>
+              <input name="entityPlural" required pattern="[a-z][a-z0-9]*" value="tareas" placeholder="tareas">
+            </label>
+            <label class="field">
+              <span>Ruta de la API</span>
+              <input name="apiPath" required pattern="/api/[a-z0-9]+(-[a-z0-9]+)*(?:/[a-z0-9]+(-[a-z0-9]+)*)*" value="/api/tareas" placeholder="/api/tareas">
+              <small>Prefijo HTTP que se registrará en backend/server.js.</small>
+            </label>
+            <label class="field">
+              <span>Identificador</span>
+              <input value="_id (automático de Mongoose)" disabled>
+              <small>La API, el listado, la edición y el borrado utilizarán el mismo identificador.</small>
+            </label>
+          </div>
+
+          <div class="subsection-heading">
+            <div>
+              <h3>Campos</h3>
+              <p>Los nombres técnicos se mantienen iguales en MongoDB, JSON, API y Vue.</p>
+            </div>
+            <button type="button" class="button button-secondary" id="add-field">Añadir campo</button>
+          </div>
+          <div id="fields-list" class="fields-list" aria-live="polite"></div>
+          <p class="help-panel">Selectores y radios usan opciones fijas en esta fase. Catálogos/API, relaciones y subida de archivos todavía no se generan.</p>
+          <div class="step-actions">
+            <button type="button" class="button button-secondary" data-back>Volver</button>
+            <button type="button" class="button button-primary" data-next>Continuar</button>
+          </div>
+        </section>
+
+        <section class="step-panel" data-step="2" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Paso 3 de 4</p>
+            <h2>Elige las operaciones</h2>
+            <p>No todas las pantallas necesitan todas las operaciones. Las casillas se validan entre sí para evitar generar acciones sin utilidad.</p>
+          </div>
+          <div class="operation-grid">
+            <label class="check-card"><input type="checkbox" name="operation" value="list" checked><span><strong>Listar</strong><small>Consultar y mostrar registros existentes.</small></span></label>
+            <label class="check-card"><input type="checkbox" name="operation" value="create" checked><span><strong>Crear</strong><small>Guardar un registro nuevo en la colección.</small></span></label>
+            <label class="check-card"><input type="checkbox" name="operation" value="edit" checked><span><strong>Editar</strong><small>Actualizar un registro seleccionado por su _id.</small></span></label>
+            <label class="check-card"><input type="checkbox" name="operation" value="delete" checked><span><strong>Borrar</strong><small>Eliminar con confirmación del navegador.</small></span></label>
+            <label class="check-card"><input type="checkbox" name="operation" value="search" checked><span><strong>Buscar</strong><small>Filtrar localmente los datos listados por los campos marcados.</small></span></label>
+          </div>
+          <p class="help-panel">La validación de campos configurada en el paso anterior se aplicará en el navegador y en el esquema Mongoose. La búsqueda funciona sobre los registros ya cargados, no consulta MongoDB.</p>
+          <div id="validation-message" class="notice notice-error" role="alert" hidden></div>
+          <div class="step-actions">
+            <button type="button" class="button button-secondary" data-back>Volver</button>
+            <button type="button" class="button button-primary" data-next>Revisar propuesta</button>
+          </div>
+        </section>
+
+        <section class="step-panel" data-step="3" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Paso 4 de 4</p>
+            <h2>Revisa antes de generar</h2>
+            <p>Confirma los nombres normalizados y la carpeta de salida. No se modificarán archivos de src/ ni de backend/.</p>
+          </div>
+          <div class="load-config-row">
+            <button type="button" id="load-config-button" class="button button-secondary">Cargar configuración guardada</button>
+            <input id="load-config-input" type="file" accept="application/json,.json" hidden>
+            <span>Abre un archivo configuracion.json generado anteriormente para revisarlo o regenerarlo.</span>
+          </div>
+          <div id="preview-summary" class="preview-summary"></div>
+          <div id="preview-message" class="notice" role="status" hidden></div>
+          <div id="generation-errors" class="notice notice-error" role="alert" hidden></div>
+          <div class="step-actions">
+            <button type="button" class="button button-secondary" data-back>Volver</button>
+            <button type="button" id="generate-button" class="button button-primary">Generar archivos</button>
+          </div>
+          <div id="generated-result" class="generated-result" hidden>
+            <div class="result-heading">
+              <div>
+                <p class="eyebrow">Generación completada</p>
+                <h3 id="result-path"></h3>
+              </div>
+              <button type="button" id="copy-all" class="button button-secondary">Copiar todos los archivos</button>
+            </div>
+            <p id="result-note" class="help-panel"></p>
+            <div id="generated-files" class="generated-files"></div>
+          </div>
+        </section>
+      </form>
+
+      <footer class="page-footer">
+        <p>Uso local para practicar. Comprueba que las normas de tu centro permiten ejecutar herramientas propias durante el examen.</p>
+        <p>Para cerrar el servidor, vuelve a la terminal y pulsa <kbd>Ctrl</kbd> + <kbd>C</kbd>.</p>
+      </footer>
+    </main>
+
+    <template id="field-template">
+      <fieldset class="field-card">
+        <legend class="field-card-title">Campo</legend>
+        <button type="button" class="remove-field" aria-label="Eliminar campo">Eliminar</button>
+        <div class="form-grid field-grid">
+          <label class="field"><span>Nombre técnico</span><input data-property="name" required pattern="[a-z][A-Za-z0-9]*" placeholder="titulo"></label>
+          <label class="field"><span>Etiqueta visible</span><input data-property="label" required placeholder="Título"></label>
+          <label class="field"><span>Tipo de dato</span>
+            <select data-property="type">
+              <option value="text">Texto</option><option value="textarea">Texto largo</option>
+              <option value="email">Correo</option><option value="phone">Teléfono</option>
+              <option value="number">Número</option><option value="date">Fecha</option>
+              <option value="time">Hora</option><option value="boolean">Booleano / checkbox</option>
+              <option value="radio">Radio</option><option value="select">Selector fijo</option>
+            </select>
+          </label>
+          <label class="field"><span>Valor inicial (opcional)</span><input data-property="defaultValue" placeholder="Ej.: pendiente"></label>
+          <label class="field"><span>Mínimo (opcional)</span><input data-property="min" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
+          <label class="field"><span>Máximo (opcional)</span><input data-property="max" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
+          <label class="field field-wide"><span>Expresión regular (opcional)</span><input data-property="pattern" placeholder="^[A-Za-z0-9 ]+$"><small>Se usa también como regla de validación Mongoose.</small></label>
+          <label class="field field-wide options-field" hidden><span>Opciones fijas</span><textarea data-property="options" rows="3" placeholder="pendiente|Pendiente&#10;completada|Completada"></textarea><small>Una opción por línea, con formato valor|etiqueta.</small></label>
+        </div>
+        <div class="field-options">
+          <label><input data-property="required" type="checkbox"> Obligatorio</label>
+          <label><input data-property="form" type="checkbox" checked> Formulario</label>
+          <label><input data-property="list" type="checkbox"> Mostrar en la tabla</label>
+          <label><input data-property="search" type="checkbox"> Incluir en búsqueda</label>
+        </div>
+      </fieldset>
+    </template>
+  </body>
+</html>
