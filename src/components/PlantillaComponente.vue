@@ -10,7 +10,13 @@
     modulo de src/api/ cuando quieras persistir los datos.
   -->
   <section class="box-border w-full min-w-0 rounded-lg bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] sm:p-8">
-    <!-- {{ titulo }} lee el ref del script; Tailwind aplica color, espaciado y bordes. -->
+    <!--
+      Esta sección es la base reutilizable para cualquier pantalla CRUD.
+      1) Cambia el texto del título por el nombre real de la entidad.
+      2) Mantén la estructura general: formulario + buscador + tabla.
+      3) Si la pantalla no necesita un campo, elimínalo en vez de copiarlo sin uso.
+      4) Si necesitas persistencia real, conecta las funciones del script a src/api/.
+    -->
     <h4 class="mb-4 rounded bg-[#1b4965] px-3 py-2 font-semibold text-white">
       {{ titulo }}
     </h4>
@@ -338,6 +344,19 @@
 <script setup>
 import { computed, reactive, ref } from "vue"
 
+/*
+ * ESTA ES LA BASE DE UN COMPONENTE CRUD EN EL PROYECTO.
+ * Sigue este patrón para cualquier nueva pantalla:
+ *   1. define el modelo del formulario,
+ *   2. prepara la lista base,
+ *   3. añade buscador y filtro,
+ *   4. crea la lógica de guardar/editar/eliminar,
+ *   5. conecta la API cuando la entidad exista en backend.
+ *
+ * Cuanto más claro y consistente sea el nombre de cada campo, menos errores
+ * tendrás al enlazarlo con v-model, con la API y con MongoDB.
+ */
+
 // Cambia este texto por el nombre de la pantalla; el template lo muestra con {{ titulo }}.
 const titulo = ref("[GESTION DE [NOMBRE DE LA ENTIDAD]]")
 
@@ -459,12 +478,20 @@ function etiquetaEstado(estado) {
 }
 
 /*
- * PARA CONECTAR ESTA PLANTILLA A UNA API:
+ * PATRÓN DE CONEXIÓN CON LA API:
  * 1. Importa getRegistros/saveRegistro/modifyRegistro/deleteRegistro desde ../api/.
  * 2. Carga registros en onMounted(), usando cargando y error en el template.
  * 3. En guardarRegistro(), llama a saveRegistro({ ...registro }) o modifyRegistro(id, datos).
  * 4. En editarRegistro y eliminarRegistro usa el identificador real, normalmente item._id.
- * 5. Tras guardar/eliminar, vuelve a pedir la lista para mostrar el estado del servidor.
- * Consulta GUIA-CREAR-COMPONENTE.md para el ejemplo de modelo, rutas y modulo Axios.
+ * 5. Tras guardar o eliminar, vuelves a pedir la lista para reflejar el estado real del backend.
+ * 6. Mantén el nombre de los campos igual en backend, API y formulario para evitar errores dolorosos.
+ *
+ * Si quieres reutilizar este patrón en otra entidad, solo cambia:
+ * - el nombre de la lista (registros -> pacientes, citas, etc.),
+ * - el objeto del formulario (registroVacio),
+ * - los nombres de las propiedades,
+ * - las funciones de API importadas.
+ *
+ * Consulta GUIA-CREAR-COMPONENTE.md para la guía detallada desde backend hasta UI.
  */
 </script>

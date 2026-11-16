@@ -1,175 +1,110 @@
-# Guía: crear una pantalla nueva en este proyecto
+# Guía para crear una pantalla nueva en este proyecto
 
-Esta guía usa **Tareas** como ejemplo. Cambia `Tarea`, `tareas`, los campos y
-los textos por los de la entidad que necesites. Si la pantalla solo muestra
-información fija, puedes omitir MongoDB y la API.
+Esta guía está pensada para que, sin consultar información externa, puedas crear una pantalla nueva desde cero siguiendo el patrón del repositorio.
 
-Como punto de partida visual, copia
-[`src/components/PlantillaComponente.vue`](./src/components/PlantillaComponente.vue).
-Ese archivo sirve como catalogo de referencia para formularios, inputs, filtros,
-mensajes, tablas y acciones CRUD. Sus datos de ejemplo son locales y se pierden
-al recargar la pagina: sigue los comentarios del script para conectarlo con
-`src/api/`. Cada campo contiene un placeholder entre corchetes para sustituirlo
-por el texto y los datos de tu entidad. Los estilos usan utilidades Tailwind CSS.
+Se usa la entidad `Tarea` como ejemplo genérico. Cuando llegue el momento de crear otra pantalla, reemplaza:
 
-## Cómo está organizado el proyecto
+- `Tarea` por tu entidad,
+- `tareas` por la colección o recurso,
+- los campos de ejemplo por los reales,
+- los textos de la interfaz por los tuyos.
 
-- `src/components/` contiene las pantallas y componentes Vue.
-- `src/api/` centraliza las peticiones HTTP con Axios; los componentes deben
-  llamar a estas funciones en vez de construir URL dentro del template.
-- `src/router/index.js` asocia una URL con cada pantalla y `src/App.vue` muestra
-  la pantalla elegida mediante `<router-view />`.
-- `src/utils/` reúne funciones reutilizables, como alertas.
-- `backend/modelos/` define los documentos y reglas de Mongoose.
-- `backend/rutas/` implementa los endpoints Express para cada recurso.
-- `backend/server.js` configura Express, conecta MongoDB y publica los catalogos
-  estaticos de `backend/data/`.
+Nunca copies código sin entender la intención: la clave es que el flujo quede claro y consistente en todo el proyecto.
 
-Los comentarios del codigo explican el proposito de una variable, una funcion
-o una regla que no sea obvia. Conviene explicar especialmente los parametros,
-el resultado esperado y los efectos sobre la API o el estado de Vue; no hace
-falta repetir en comentarios lo que el nombre del codigo ya expresa.
+## 1. Qué va a crear cada capa
 
-En un archivo `.vue`, el `<template>` contiene el HTML que Vue convierte en
-interfaz y el `<script setup>` define el estado y las funciones que ese HTML
-utiliza. Por ejemplo, `v-model="form.nombre"` sincroniza un campo con una
-propiedad reactiva; `@click="guardar"` llama a la funcion del script;
-`{{ titulo }}` muestra un valor; y `v-for="item in elementos"` repite el
-bloque por cada registro. Escribe comentarios HTML (`<!-- ... -->`) junto a
-las zonas que usan esas conexiones, sobre todo cuando el flujo no sea obvio.
+Antes de escribir HTML o JavaScript, es importante entender qué hace cada parte:
 
-Los archivos `.json` y `package.json` deben seguir siendo JSON valido y no
-admiten comentarios. Documenta el significado y el formato de esos datos en
-esta guia o en el codigo que los consume, no insertando comentarios en JSON.
+### Backend
 
-## Iniciar la aplicacion en local
+- `backend/modelos/`: define la estructura de la entidad en MongoDB.
+- `backend/rutas/`: expone endpoints HTTP para listar, crear, actualizar y borrar.
+- `backend/server.js`: monta las rutas y conecta la base de datos.
 
-1. Instala las dependencias con `npm install`.
-2. Inicia MongoDB con `docker compose up -d`.
-3. Configura `MONGO_URI` y, si hace falta, `PORT` en `.env`; no copies
-   credenciales reales a codigo ni a repositorios compartidos.
-4. Ejecuta `npm run start` para iniciar Vite y el servidor Express.
+### Frontend
 
-El cliente y el backend usan actualmente `http://localhost:3000/api` como raiz
-de la API. Si se cambia el host o el puerto, actualiza las URL de los modulos
-correspondientes de `src/api/`.
+- `src/api/`: funciones Axios para acceder a la API.
+- `src/components/`: pantallas y componentes visuales.
+- `src/router/`: activa la pantalla según la URL.
+- `src/App.vue`: estructura global con menú y contenido dinámico.
 
-### Endpoints disponibles
+### Flujo real de una pantalla
 
-| Metodo | Endpoint | Uso |
-|---|---|---|
-| `GET` | `/api/pacientes` | Listar pacientes |
-| `POST` | `/api/pacientes` | Crear paciente |
-| `GET` | `/api/pacientes/:dni` | Buscar paciente por DNI |
-| `PUT` | `/api/pacientes/:dni` | Modificar paciente |
-| `DELETE` | `/api/pacientes/:dni` | Eliminar paciente |
-| `GET` | `/api/doctores` | Listar doctores |
-| `GET` | `/api/doctores/:especialidad` | Filtrar doctores por especialidad |
-| `POST`, `PUT`, `DELETE` | `/api/doctores` y `/api/doctores/:id` | Gestionar doctores |
-| `GET`, `POST` | `/api/citas` | Listar y crear citas |
-| `PUT`, `DELETE` | `/api/citas/:id` | Modificar y eliminar citas |
-| `GET` | `/api/municipios` | Leer provincias y municipios desde JSON |
-| `GET` | `/api/especialidades` | Leer el catalogo estatico de especialidades |
+Los datos se mueven así:
 
-Las rutas de pacientes, doctores y citas necesitan MongoDB. Los catalogos JSON
-no dependen de la base de datos. Para cualquier peticion, conserva el manejo del
-error en el componente: las funciones Axios rechazan la promesa si el backend
-responde con un estado HTTP de error.
+1. El usuario rellena el formulario en el componente.
+2. El componente llama a una función del módulo `src/api/`.
+3. La API hace una petición HTTP con Axios.
+4. El backend recibe la petición, valida y guarda la información.
+5. La respuesta vuelve al componente.
+6. El componente actualiza la lista y la interfaz.
 
-### Reutilizar un modulo de API desde otro componente
+## 2. Cómo está organizado este proyecto
 
-Importa las funciones desde `src/api/` y carga los datos en `onMounted()`. Las
-funciones devuelven directamente el contenido JSON, no el objeto de respuesta
-de Axios. Por ejemplo, para crear un selector dependiente de provincia:
+- `src/components/`: pantallas Vue.
+- `src/api/`: capa HTTP.
+- `src/router/index.js`: rutas de navegación.
+- `src/store/`: estado compartido con Pinia.
+- `src/utils/`: funciones reutilizables.
+- `backend/modelos/`: modelos Mongoose.
+- `backend/rutas/`: rutas REST.
+- `backend/data/`: catálogos estáticos JSON.
+- `backend/server.js`: arranque de la aplicación y conexión a MongoDB.
 
-```vue
-<script setup>
-import { onMounted, ref } from "vue"
-import { obtenerMunicipios, obtenerProvincias } from "../api/municipios.js"
+## 3. Plantilla de referencia
 
-// Las listas se enlazan a los selectores del template con v-for y v-model.
-const provincias = ref([])
-const municipios = ref([])
+La referencia visual y funcional es:
 
-// Carga el primer selector cuando la pantalla ya esta montada.
-onMounted(async () => {
-  try {
-    provincias.value = await obtenerProvincias()
-  } catch (error) {
-    console.error("No se pudieron cargar las provincias:", error)
-  }
-})
+- [src/components/PlantillaComponente.vue](./src/components/PlantillaComponente.vue)
 
-// Al cambiar de provincia, su id permite cargar solo sus municipios.
-async function seleccionarProvincia(idProvincia) {
-  try {
-    municipios.value = await obtenerMunicipios(idProvincia)
-  } catch (error) {
-    municipios.value = []
-    console.error("No se pudieron cargar los municipios:", error)
-  }
+Ese archivo contiene:
+
+- formulario para crear/editar,
+- inputs tipo texto, email, fecha, número, select, checkbox, radio, textarea,
+- carga de lista,
+- buscador,
+- mensajes de error,
+- tabla con edición y borrado,
+- lógica para cambiar entre modo creación y edición,
+- ejemplo de `v-model`, `v-for`, `computed`, `onMounted` y `@submit.prevent`.
+
+Si no sabes por dónde empezar, copia la plantilla y modifica cada bloque con tu entidad.
+
+## 4. Preparar la entidad antes de programar
+
+Antes de tocar componentes o rutas, responde esto:
+
+| Campo | Tipo | Obligatorio | Observación |
+|---|---|---:|---|
+| `titulo` | texto | sí | nombre visible del registro |
+| `descripcion` | texto | no | puede estar vacío |
+| `fecha` | fecha | no | útil para citas o tareas |
+| `estado` | texto | no | activo/pendiente/etc. |
+| `confirmado` | booleano | no | checkbox |
+
+Ejemplo:
+
+```js
+const nuevaTarea = {
+  titulo: "",
+  descripcion: "",
+  fecha: "",
+  estado: "activo",
+  confirmado: false
 }
-</script>
 ```
 
-`/api/municipios` devuelve `{ provincias: [{ id, nm }], municipios: [{ id,
-nm }] }`; el identificador de cada municipio empieza por el codigo de su
-provincia. `/api/especialidades` devuelve
-`{ especialidades: [{ id, nm }] }`. Usa las funciones
-`obtenerProvincias()`, `obtenerMunicipios(idProvincia)` y
-`obtenerEspecialidades()` para no repetir estas rutas ni su filtrado.
+La regla importante es que el nombre del campo debe ser el mismo desde:
 
-## Estilos con Tailwind CSS
+- MongoDB,
+- Express,
+- Axios,
+- `ref`/`reactive` del componente,
+- `v-model` del template.
 
-Pon las utilidades directamente en el `class` del elemento, en lugar de crear
-un bloque `<style>` para reglas nuevas:
+## 5. Crear el modelo de MongoDB
 
-```vue
-<section class="w-full rounded-lg bg-white p-8 shadow">
-  <h4 class="mb-4 rounded bg-[#1b4965] px-3 py-2 font-semibold text-white">
-    Mi pantalla
-  </h4>
-</section>
-```
-
-Las clases como `w-full`, `p-8`, `rounded-lg` y `shadow` son utilidades
-componibles de Tailwind: respectivamente controlan ancho, espaciado, bordes
-redondeados y sombra. Las variantes como `hover:` o `max-[768px]:` aplican
-estilos bajo una interaccion o un ancho de pantalla. No hace falta memorizar
-todas: busca un ejemplo en la plantilla o en los componentes existentes.
-
-Para una condición visual, combina clases estáticas con una clase dinámica de
-Vue:
-
-```vue
-<input
-  v-model="form.nombre"
-  :class="{ 'border-2 border-red-600': error }"
-  class="w-full rounded border p-2"
-/>
-```
-
-Las clases compartidas por formularios complejos existentes están centralizadas
-en `src/style.css` con `@apply`; para un componente nuevo, prioriza las
-utilidades directamente en el template. Tailwind está integrado con Vite y no
-necesita un archivo de configuración adicional para este proyecto.
-
-## 1. Diseña los datos
-
-Antes de programar, apunta qué necesita guardar cada registro. Ejemplo:
-
-| Campo | Tipo | Obligatorio |
-|---|---|---|
-| `titulo` | texto | sí |
-| `descripcion` | texto | no |
-| `completada` | booleano | no |
-
-Usa los mismos nombres en el modelo, la API y el componente para evitar errores
-de escritura y de enlace con `v-model`.
-
-## 2. Crea el modelo de MongoDB
-
-Crea `backend/modelos/Tarea.js`. El esquema define los campos y sus reglas:
+Crea el archivo `backend/modelos/Tarea.js`.
 
 ```js
 import mongoose from "mongoose"
@@ -188,12 +123,18 @@ const TareaSchema = new mongoose.Schema(
 export default mongoose.model("Tarea", TareaSchema)
 ```
 
-MongoDB/Mongoose crea `_id` automáticamente. No hace falta inventar un ID
-manual salvo que el ejercicio lo pida.
+Qué significa cada parte:
 
-## 3. Crea las rutas del backend (si guardarás datos)
+- `required: true`: campo obligatorio.
+- `trim: true`: quita espacios al principio y al final.
+- `default: ""` o `default: false`: valor por defecto si el usuario no lo envía.
+- `collection: "tareas"`: nombre real de la colección en MongoDB.
 
-Crea `backend/rutas/tareas.rutas.js`. Cada ruta atiende una operación HTTP:
+Mongoose crea automáticamente el campo `_id`.
+
+## 6. Crear las rutas del backend
+
+Crea `backend/rutas/tareas.rutas.js`.
 
 ```js
 import express from "express"
@@ -201,7 +142,6 @@ import Tarea from "../modelos/Tarea.js"
 
 const router = express.Router()
 
-// GET /api/tareas: devolver todos los registros.
 router.get("/", async (req, res) => {
   try {
     const tareas = await Tarea.find().lean()
@@ -212,7 +152,6 @@ router.get("/", async (req, res) => {
   }
 })
 
-// POST /api/tareas: validar y crear un registro.
 router.post("/", async (req, res) => {
   try {
     const tarea = await Tarea.create({
@@ -220,6 +159,7 @@ router.post("/", async (req, res) => {
       descripcion: req.body.descripcion ?? "",
       completada: req.body.completada ?? false
     })
+
     res.status(201).json(tarea)
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -231,7 +171,6 @@ router.post("/", async (req, res) => {
   }
 })
 
-// PUT /api/tareas/:id: modificar un registro por su _id de MongoDB.
 router.put("/:id", async (req, res) => {
   try {
     const tarea = await Tarea.findByIdAndUpdate(
@@ -259,7 +198,6 @@ router.put("/:id", async (req, res) => {
   }
 })
 
-// DELETE /api/tareas/:id: eliminar un registro por su _id.
 router.delete("/:id", async (req, res) => {
   try {
     const tarea = await Tarea.findByIdAndDelete(req.params.id)
@@ -282,87 +220,131 @@ router.delete("/:id", async (req, res) => {
 export default router
 ```
 
-## 4. Registra las rutas en el servidor
+Qué hace cada endpoint:
 
-En `backend/server.js`, importa el router y móntalo junto a pacientes y
-doctores. `express.json()` debe estar registrado para poder leer `req.body`:
+- `GET /api/tareas`: lista todo.
+- `POST /api/tareas`: crea un registro nuevo.
+- `PUT /api/tareas/:id`: modifica un registro concreto.
+- `DELETE /api/tareas/:id`: borra un registro concreto.
+
+Entonces, cuando crees otra entidad, repite el mismo patrón con nombres adaptados.
+
+## 7. Montar la ruta en el servidor
+
+Edita `backend/server.js` y añade:
 
 ```js
 import tareasRutas from "./rutas/tareas.rutas.js"
 
-// Después de app.use(express.json()):
+app.use(express.json())
 app.use("/api/tareas", tareasRutas)
 ```
 
-La URL base de ejemplo queda como `http://localhost:3000/api/tareas`.
+Esto hace que la aplicación responda en una URL como:
 
-## 5. Crea el cliente de API (si la pantalla usa el backend)
+```text
+http://localhost:3000/api/tareas
+```
 
-Crea `src/api/tareas.js`. Esta capa mantiene las peticiones HTTP fuera del
-componente:
+La clave es que el `app.use("/api/...", router)` debe coincidir exactamente con la URL que usarás en frontend.
+
+## 8. Crear la capa de API del cliente
+
+Crea `src/api/tareas.js`.
 
 ```js
 import axios from "axios"
 
-// Mantener la URL en un solo sitio facilita cambiar el host o puerto de la API.
 const API_URL = "http://localhost:3000/api/tareas"
 
-// Cada funcion devuelve res.data para que el componente no dependa de Axios.
 export async function getTareas() {
   const res = await axios.get(API_URL)
   return res.data
 }
 
-// tarea es el objeto con los campos que espera el modelo de MongoDB.
 export async function saveTarea(tarea) {
   const res = await axios.post(API_URL, tarea)
   return res.data
 }
 
-// id es el _id devuelto por MongoDB; tarea contiene los campos a actualizar.
 export async function modifyTarea(id, tarea) {
   const res = await axios.put(`${API_URL}/${id}`, tarea)
   return res.data
 }
 
-// Elimina una tarea usando el mismo identificador que devuelve getTareas().
 export async function deleteTarea(id) {
   const res = await axios.delete(`${API_URL}/${id}`)
   return res.data
 }
 ```
 
-## 6. Prepara el componente de la pantalla
+### Por qué esta capa es importante
 
-1. Copia `src/components/PlantillaComponente.vue` a
-   `src/components/XestionTareas.vue`.
-2. Cambia el título, las propiedades del objeto del formulario y los campos.
-3. En el `<script setup>`, importa las funciones del API.
-4. Carga la lista al abrir la pantalla con `onMounted`.
-5. Sustituye el `push()` local por `await saveTarea(...)` y vuelve a cargar la
-   lista tras guardar o eliminar.
-6. Muestra los errores en la interfaz; no los ocultes con un `catch` vacío.
-7. Describe con comentarios el proposito de los estados y las funciones que
-   no sean evidentes; actualiza esta guia si incorporas un patron compartido.
+- separa HTTP del componente,
+- centraliza la URL base,
+- evita repetir `axios.get` dentro del template,
+- facilita reutilizar la lógica en varios componentes,
+- facilita pruebas y mantenimiento.
 
-Ejemplo de la parte esencial del script conectado al API:
+## 9. Crear el componente frontend
+
+Copia la plantilla:
+
+```text
+src/components/PlantillaComponente.vue
+```
+
+y renómbrala a algo como:
+
+```text
+src/components/XestionTareas.vue
+```
+
+### Cambia estas cosas
+
+1. Título y textos visibles.
+2. `registroVacio` con los campos de tu entidad.
+3. `registros` por la lista de la entidad.
+4. `guardarRegistro` por una función que llame a `saveTarea` o `modifyTarea`.
+5. `editarRegistro` y `eliminarRegistro` con la lógica real.
+6. `listaFiltrada` y el buscador para la entidad real.
+7. `v-for` para la nueva colección.
+
+Ejemplo de cómo quedaría el estado inicial:
 
 ```vue
 <script setup>
-import { onMounted, reactive, ref } from "vue"
+import { computed, onMounted, reactive, ref } from "vue"
 import { deleteTarea, getTareas, saveTarea } from "../api/tareas.js"
 
+const titulo = ref("Gestión de tareas")
 const tareas = ref([])
-// Indicadores vinculados al template para mostrar carga y errores de red.
 const cargando = ref(false)
+const guardando = ref(false)
 const error = ref("")
-// Modelo del formulario; reactive permite acceder a sus propiedades sin .value.
-const nuevaTarea = reactive({ titulo: "", descripcion: "" })
+const editando = ref(false)
 
-// Consulta la API y garantiza que el indicador de carga se restablezca al final.
+const tareaVacia = () => ({
+  _id: "",
+  titulo: "",
+  descripcion: "",
+  completada: false
+})
+
+const tarea = reactive(tareaVacia())
+const buscar = ref("")
+
+const listaFiltrada = computed(() => {
+  const texto = buscar.value.toLowerCase()
+  return tareas.value.filter((item) =>
+    `${item.titulo} ${item.descripcion}`.toLowerCase().includes(texto)
+  )
+})
+
 async function cargarTareas() {
   cargando.value = true
   error.value = ""
+
   try {
     tareas.value = await getTareas()
   } catch (err) {
@@ -372,22 +354,29 @@ async function cargarTareas() {
   }
 }
 
-// Envia una copia del formulario para que la capa de API gestione la peticion HTTP.
 async function guardarTarea() {
   error.value = ""
+  guardando.value = true
+
   try {
-    await saveTarea({ ...nuevaTarea })
-    nuevaTarea.titulo = ""
-    nuevaTarea.descripcion = ""
+    if (editando.value) {
+      await modifyTarea(tarea._id, { ...tarea })
+    } else {
+      await saveTarea({ ...tarea })
+    }
+
     await cargarTareas()
+    limpiarFormulario()
   } catch (err) {
     error.value = err.response?.data?.mensaje || "No se pudo guardar la tarea."
+  } finally {
+    guardando.value = false
   }
 }
 
-// Elimina por el identificador de MongoDB y actualiza la lista del componente.
 async function eliminarTarea(id) {
   error.value = ""
+
   try {
     await deleteTarea(id)
     await cargarTareas()
@@ -396,65 +385,172 @@ async function eliminarTarea(id) {
   }
 }
 
-// Ejecuta cargarTareas cuando Vue ha montado el componente.
+function limpiarFormulario() {
+  Object.assign(tarea, tareaVacia())
+  editando.value = false
+  error.value = ""
+}
+
+function editarTarea(item) {
+  Object.assign(tarea, item)
+  editando.value = true
+}
+
 onMounted(cargarTareas)
 </script>
 ```
 
-En el template de ese componente, el formulario usaría
-`@submit.prevent="guardarTarea"`, la lista `v-for="tarea in tareas"` y el botón
-de borrado `@click="eliminarTarea(tarea._id)"`. Usa `tarea._id` porque Mongoose
-devuelve el identificador de MongoDB con ese nombre.
+### Recomendación para el template
 
-## 7. Añade la ruta del frontend
+En el template, sigue esta lógica:
 
-En `src/router/index.js`:
+```vue
+<form @submit.prevent="guardarTarea">
+  <input v-model="tarea.titulo" />
+  <textarea v-model="tarea.descripcion" />
+  <button type="submit">
+    {{ editando ? "Guardar cambios" : "Crear tarea" }}
+  </button>
+</form>
+
+<input v-model="buscar" type="search" />
+
+<div v-if="cargando">Cargando...</div>
+<div v-else-if="listaFiltrada.length === 0">No hay registros</div>
+<table v-else>
+  <tr v-for="item in listaFiltrada" :key="item._id">
+    <td>{{ item.titulo }}</td>
+    <td>{{ item.descripcion }}</td>
+    <td>
+      <button type="button" @click="editarTarea(item)">Editar</button>
+      <button type="button" @click="eliminarTarea(item._id)">Eliminar</button>
+    </td>
+  </tr>
+</table>
+```
+
+## 10. Añadir la ruta al frontend
+
+En `src/router/index.js` añade la nueva pantalla:
 
 ```js
 import XestionTareas from "../components/XestionTareas.vue"
 
-// Dentro del array routes, antes de la ruta comodín NotFound:
-{ path: "/tareas", name: "XestionTareas", component: XestionTareas },
+const routes = [
+  { path: "/", name: "Inicio", component: Inicio },
+  { path: "/tareas", name: "XestionTareas", component: XestionTareas },
+  { path: "/:pathMatch(.*)", name: "NotFound", component: NotFound }
+]
 ```
 
-La ruta comodín (`/:pathMatch(.*)`) debe quedarse al final para que no capture
-antes las rutas concretas.
+La ruta genérica `NotFound` siempre debe ir al final.
 
-## 8. Añade el enlace al menú
+## 11. Añadir la navegación al menú
 
-En el `<ul>` de `src/components/NavBar.vue`:
+En `src/components/NavBar.vue`, añade un enlace tipo:
 
 ```vue
-<li><RouterLink to="/tareas">Tareas</RouterLink></li>
+<RouterLink to="/tareas">Tareas</RouterLink>
 ```
 
-`RouterLink` navega sin recargar la página. El contenido de la ruta se muestra
-en `<router-view />`, que ya está en `src/App.vue`; normalmente no hay que
-modificar `App.vue`.
+Esto hace que el contenido de la ruta se renderice en `<router-view />` dentro de `App.vue`.
 
-## Vue que conviene recordar para el examen
+## 12. Cómo validar que no haya errores
 
-| Sintaxis | Para qué sirve | Ejemplo |
-|---|---|---|
-| `ref(valor)` | Estado reactivo simple o lista | `const visible = ref(false)` |
-| `reactive(objeto)` | Formulario con varios campos | `const form = reactive({ nombre: "" })` |
-| `v-model` | Enlazar input y estado | `v-model="form.nombre"` |
-| `@click` | Ejecutar una acción al pulsar | `@click="eliminar(id)"` |
-| `@submit.prevent` | Enviar formulario sin recargar | `@submit.prevent="guardar"` |
-| `v-if` / `v-else` | Mostrar contenido según condición | `v-if="error"` |
-| `v-for` y `:key` | Repetir elementos de una lista | `v-for="x in lista" :key="x._id"` |
-| `:disabled` | Vincular un atributo a una condición | `:disabled="cargando"` |
-| `:class` | Aplicar clases según estado | `:class="{ incorrecto: hayError }"` |
-| `onMounted()` | Ejecutar código al mostrar el componente | `onMounted(cargarLista)` |
-| `computed()` | Derivar un valor de otro estado | `computed(() => lista.value.length)` |
+Ejecuta esta comprobación al final:
 
-### Comprobación rápida
+```bash
+npm run build
+```
 
-- ¿El nombre importado existe y coincide exactamente con el archivo?
-- ¿Cada propiedad usada por `v-model` está inicializada en `ref` o `reactive`?
-- ¿El `@submit.prevent` llama a una función declarada?
-- ¿Los botones que no envían el formulario tienen `type="button"`?
-- ¿El router está montado en `main.js` y la ruta está antes de NotFound?
-- ¿El backend importa y monta el router con la misma URL que usa Axios?
-- ¿El backend está iniciado y MongoDB conectado?
-- Ejecuta `npm run build` para encontrar errores de compilación de Vue.
+Cuando la compilación funciona, el proyecto está listo para seguir con la lógica de negocio y la validación de la pantalla.
+
+## 13. Patrones que conviene recordar
+
+### Estado reactivo
+
+```js
+const visible = ref(false)
+const form = reactive({ nombre: "", descripcion: "" })
+```
+
+### Bindeo con formulario
+
+```vue
+<input v-model="form.nombre" />
+```
+
+### Acciones de formulario
+
+```vue
+<form @submit.prevent="guardar">
+```
+
+### Listas y repetición
+
+```vue
+<li v-for="item in lista" :key="item._id">{{ item.nombre }}</li>
+```
+
+### Condiciones
+
+```vue
+<p v-if="error">{{ error }}</p>
+```
+
+### Carga inicial
+
+```js
+onMounted(cargarLista)
+```
+
+### Filtro derivado
+
+```js
+const listaFiltrada = computed(() => {
+  return lista.value.filter((item) => item.nombre.includes(buscar.value))
+})
+```
+
+## 14. Checklist final para crear una nueva pantalla
+
+Antes de considerar la pantalla terminada, revisa esto:
+
+- ¿La entidad tiene modelo en backend?
+- ¿La ruta del backend existe?
+- ¿La ruta está montada en `backend/server.js`?
+- ¿La URL de `src/api` coincide con el endpoint?
+- ¿El componente tiene `script setup` con `ref` o `reactive`?
+- ¿El template usa `v-model` sobre variables reales?
+- ¿La lista usa `v-for` con `:key`?
+- ¿La carga inicial se hace en `onMounted()`?
+- ¿Los errores se muestran en pantalla?
+- ¿La ruta está registrada en el router?
+- ¿Hay un enlace en el menú?
+- ¿La compilación pasa con `npm run build`?
+
+## 15. Recomendaciones para crear componentes nuevos sin ayuda externa
+
+Estas prácticas te van a ahorrar tiempo:
+
+1. Empieza por los campos, no por el HTML.
+2. Haz primero el modelo del formulario.
+3. Crea el backend antes de la interfaz.
+4. Copia la plantilla y adapta solo lo necesario.
+5. Mantén nombres iguales en todas las capas.
+6. No ocultes errores: muéstralos y gestionarlos.
+7. No metas lógica de negocio dentro del template.
+8. Usa comentarios solo donde aporten contexto real.
+9. Reutiliza patrones ya existentes: `guardar`, `editar`, `eliminar`, `limpiar`, `cargar`, `buscar`.
+10. Cuando algo se repita, conviértelo en función o utilidad.
+
+## 16. Referencias rápidas del repositorio
+
+- [src/components/PlantillaComponente.vue](./src/components/PlantillaComponente.vue)
+- [src/router/index.js](./src/router/index.js)
+- [src/App.vue](./src/App.vue)
+- [backend/server.js](./backend/server.js)
+- [src/api/pacientes.js](./src/api/pacientes.js)
+- [backend/modelos/Paciente.js](./backend/modelos/Paciente.js)
+
+La clave para no perderte es esta: no empieces por la vista, empieza por la entidad, luego backend, luego API, luego componente, y por último router y navegación. Así todo encaja sin información adicional.

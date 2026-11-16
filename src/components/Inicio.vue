@@ -1,5 +1,5 @@
 <template>
-  <main class="flex flex-1 flex-col gap-8 py-3 pb-10 sm:gap-10">
+  <main class="flex flex-1 flex-col gap-8 rounded-lg bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] sm:gap-10 sm:p-8">
     <section
       class="relative isolate flex min-h-[clamp(27rem,55vh,39rem)] items-center overflow-hidden rounded-2xl bg-[#193b4c] text-white sm:rounded-3xl"
       aria-labelledby="portada-titulo"
