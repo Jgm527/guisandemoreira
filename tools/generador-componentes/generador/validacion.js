@@ -194,7 +194,7 @@ export function validateConfiguration(input) {
       errors.push(`${prefix}: ${relationMeta.label} es un catálogo de solo lectura y no guarda documentos en MongoDB, así que no puede referenciarse con ObjectId. Usa un campo selector con opciones fijas si solo necesitas etiquetas.`)
     }
     if (!isValidIdentifier(relation.fieldName) || relation.fieldName.length > 40) {
-      errors.push(`${prefix}: el campo que guarda la referencia debe empezar en minúscula y usar solo letras y números (por ejemplo, pacienteId).`)
+      errors.push(`${prefix}: el campo que guarda la relación debe empezar en minúscula y usar solo letras y números (por ejemplo, pacienteDNI).`)
     } else if (seenFields.has(relation.fieldName)) {
       errors.push(`${prefix}: el campo "${relation.fieldName}" ya existe entre los campos de la pantalla.`)
     } else if (seenRelationNames.has(relation.fieldName)) {
@@ -396,4 +396,3 @@ export function validateConfiguration(input) {
 
   return { errors, config }
 }
-

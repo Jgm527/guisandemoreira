@@ -15,7 +15,7 @@ const config = {
   ],
   operations: ["list", "create", "edit", "delete", "search"],
   relations: [
-    { resource: "pacientes", fieldName: "pacienteId", label: "Paciente", required: true, selection: "api", filterable: true },
+    { resource: "pacientes", fieldName: "pacienteDNI", label: "Paciente", required: true, selection: "api", filterable: true },
     { resource: "doctores", fieldName: "doctorId", label: "Doctor", required: true, selection: "pinia", filterable: false },
   ],
   pinia: { enabled: true, fields: ["descripcion", "estado"] },

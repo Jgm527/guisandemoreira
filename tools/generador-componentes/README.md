@@ -51,20 +51,23 @@ El tipo de pantalla **Relacionado** está disponible para entidades nuevas. En e
 paso 4 del formulario se declaran relaciones con pacientes, doctores o citas y,
 de forma independiente, si la pantalla comparte su propia selección con Pinia:
 
-- Cada relación genera un campo de referencia `{ type: ObjectId, ref: "..." }`
-  en el modelo (patrón de `backend/modelos/Cita.js`) y una llamada a
-  `validarRelaciones()` en el router, que comprueba con `Modelo.exists()` que el
-  documento relacionado existe antes de crear o editar (patrón de
-  `backend/rutas/citas.rutas.js`).
+- Cada relación genera un campo en el modelo y una llamada a
+  `validarRelaciones()` en el router. La relación
+  con pacientes es la excepción: guarda su DNI como texto y valida
+  `Paciente.exists({ dnipac })`, siguiendo `backend/modelos/Cita.js`; doctores y
+  citas siguen usando `ObjectId`/`ref`.
 - Cada relación se escoge con un **selector de la API** (lista real del recurso)
   o con la **selección compartida** de un store que ya existe en el proyecto
   (`pacienteStore` y `doctorStore`; Citas no tiene store, así que solo admite
   selector).
 - Si el listado se marca como filtrable, el router y el módulo de API admiten
-  `?pacienteId=...` igual que `getCitas`.
+  un parámetro con el nombre del campo configurado, por ejemplo
+  `?pacienteDNI=...` para una relación con pacientes.
 - Si se pide compartir la selección, se genera `src/store/<entidad>Store.js`
   (patrón de `doctorStore.js`) y el componente añade un botón **Compartir** en
   la tabla; la guía explica cómo consumir el store desde otra pantalla.
+- Tras guardar, el formulario conserva los datos y pasa al modo edición del
+  registro devuelto por la API; las etiquetas de acción usan una sola palabra.
 - Antes de generar, el servidor comprueba que los módulos de API y los stores
   que el componente va a importar existen de verdad; si falta alguno, se
   detiene y lo explica.

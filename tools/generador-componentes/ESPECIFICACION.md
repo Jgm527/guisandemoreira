@@ -6,8 +6,9 @@ Este documento recoge el alcance objetivo del generador local. La primera
 entrega ya implementa un subconjunto explícito: servidor local, formulario
 offline, validación, generación CRUD de entidad nueva, vista previa, escritura
 limitada a `salidas/`, copia de archivos y configuración reutilizable. Una
-segunda entrega añade el tipo Relacionado para entidades nuevas: relaciones con
-`ObjectId`/`ref`, validación de referencias en el router, selectores alimentados
+segunda entrega añade el tipo Relacionado para entidades nuevas: relaciones por
+DNI de pacientes o por `ObjectId`/`ref` de doctores y citas, validación de
+relaciones en el router, selectores alimentados
 por la API real, consumo de los stores existentes del proyecto y generación de
 stores Pinia propios con botón de compartir selección. Las funciones no
 indicadas como implementadas siguen pendientes y la herramienta
@@ -287,14 +288,16 @@ Para cada relación, preguntar:
 
 Patrones permitidos inicialmente:
 
-- una referencia a un documento con `ObjectId` y `ref` de Mongoose;
+- relación con pacientes por DNI (`dnipac` como texto) o con doctores/citas por
+  `ObjectId` y `ref` de Mongoose;
 - comprobar en backend que el documento relacionado existe;
 - seleccionar datos en un componente y compartirlos con otro usando un store
   Pinia;
 - consultar y filtrar registros usando los identificadores compartidos.
 
 Los ejemplos locales para estudiar estos patrones son las citas relacionadas
-con pacientes y doctores. La versión inicial no pretende generar relaciones
+con pacientes mediante DNI (`pacienteDNI`) y con doctores mediante `ObjectId`
+(`doctorId`). La versión inicial no pretende generar relaciones
 arbitrarias muchos-a-muchos, transacciones ni un sistema de permisos.
 
 Estado de implementación de este paso: disponible para entidades nuevas y
@@ -302,7 +305,7 @@ pantallas CRUD, Relacionado o Formulario, con estas limitaciones declaradas:
 
 - Las entidades relacionadas son los recursos reales del proyecto con
   documentos en MongoDB (pacientes, doctores y citas); los catálogos de solo
-  lectura no pueden referenciarse con `ObjectId`.
+  lectura no pueden relacionarse.
 - El consumo por Pinia usa los stores que ya existen (`pacienteStore` y
   `doctorStore`); no se generan stores de entidades relacionadas.
 - El store propio se genera para la entidad de la pantalla, no para las

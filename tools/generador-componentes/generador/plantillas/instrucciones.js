@@ -101,9 +101,9 @@ La integración en backend/server.js, src/router/index.js y src/components/NavBa
 
 ## Archivos generados
 
-- \`backend/modelos/${singular}.js\`: esquema Mongoose (modelo: las reglas y estructura de un documento).${relations.length ? " Incluye los campos de referencia con `ObjectId` y `ref`." : ""}
+- \`backend/modelos/${singular}.js\`: esquema Mongoose (modelo: las reglas y estructura de un documento).${relations.length ? " Incluye las relaciones con el identificador correspondiente: DNI para pacientes y `ObjectId`/`ref` para doctores y citas." : ""}
 - \`backend/rutas/${slugify(plural)}.rutas.js\`: router Express (grupo de endpoints HTTP del recurso).${relations.length ? " Incluye `validarRelaciones()`, que comprueba que cada documento relacionado existe." : ""}
-- \`src/api/${slugify(plural)}.js\`: funciones Axios (capa que envía peticiones a la API).${listRelations.length ? " El listado admite filtros por relación, por ejemplo `?pacienteId=...`." : ""}
+- \`src/api/${slugify(plural)}.js\`: funciones Axios (capa que envía peticiones a la API).${listRelations.length ? ` El listado admite filtros por relación, por ejemplo \`?${listRelations[0].fieldName}=...\`.` : ""}
 - \`src/components/${component}.vue\`: pantalla Vue con el patrón compatible con ${type}.
 ${config.pinia.enabled ? `- \`src/store/${slugify(singular)}Store.js\`: store Pinia que comparte la selección de esta pantalla con otras.\n` : ""}- \`configuracion.json\`: respuestas estructuradas que permiten revisar o volver a generar la propuesta.
 - \`INSTRUCCIONES.md\`: esta guía de integración.
@@ -112,16 +112,21 @@ Una **colección** es el conjunto de documentos de ${plural} en MongoDB. Un **en
 ${relations.length ? `
 ## Relaciones con otras entidades
 
-Cada campo de relación guarda el **ObjectId** del documento relacionado: es una **referencia** (\`ref\` de Mongoose), igual que \`pacienteId\` en \`backend/modelos/Cita.js\`. MongoDB no copia los datos del documento relacionado, solo su identificador.
+${relations.some((relation) => RESOURCE_LIBRARY[relation.resource].relationIdField)
+    ? "Las relaciones guardan el identificador público definido para cada recurso: las de pacientes guardan el DNI (`dnipac`) como texto, igual que `pacienteDNI` en `backend/modelos/Cita.js`; las de doctores y citas guardan el `ObjectId` con referencia `ref` de Mongoose."
+    : "Cada campo de relación guarda el `ObjectId` del documento relacionado como referencia `ref` de Mongoose. MongoDB no copia los datos del documento relacionado, solo su identificador."}
 ${relations.map((relation) => {
   const meta = RESOURCE_LIBRARY[relation.resource]
+  const identifier = meta.relationIdField
+    ? `el campo \`${meta.relationIdField}\` (texto)`
+    : "el ObjectId del documento"
   const escoger = relation.selection === "api"
     ? `un **selector** en el formulario, alimentado con \`GET ${meta.apiPath}\` (\`${meta.apiFunctions.list}\` de \`src/api/${meta.apiFile}\`)`
-    : `la **selección compartida** del store \`src/store/${meta.store.file}\` (\`${meta.store.importName}\`), igual que \`Citas.vue\` usa \`pacienteStore.idPaciente\``
-  return `- **${escapeHtml(relation.label)}**: campo \`${relation.fieldName}\`, ${relation.required ? "obligatoria" : "opcional"}, se escoge con ${escoger}.${relation.filterable ? ` El listado admite \`GET ${apiPath}?${relation.fieldName}=...\`.` : ""}`
+    : `la **selección compartida** del store \`src/store/${meta.store.file}\` (\`${meta.store.importName}\`)`
+  return `- **${escapeHtml(relation.label)}**: el campo \`${relation.fieldName}\` guarda ${identifier}, ${relation.required ? "obligatorio" : "opcional"}, se escoge con ${escoger}.${relation.filterable ? ` El listado admite \`GET ${apiPath}?${relation.fieldName}=...\`.` : ""}`
 }).join("\n")}
 
-El router generado incluye \`validarRelaciones()\`: antes de crear o editar comprueba con \`Modelo.exists({ _id: ... })\` que cada documento relacionado existe y, si no, responde 400 con un mensaje claro (patrón de \`backend/rutas/citas.rutas.js\`).
+El router generado incluye \`validarRelaciones()\`: antes de crear o editar comprueba que cada documento relacionado existe. Para pacientes busca por \`dnipac\`; para el resto busca por \`_id\`. Si no existe, responde 400 con un mensaje claro.
 ${config.pinia.enabled ? `
 ## Compartir la selección con Pinia
 
@@ -143,7 +148,7 @@ ${ownStoreVariable}.limpiar${singular}();
 
 ${piniaRelations.map((relation) => {
   const meta = RESOURCE_LIBRARY[relation.resource]
-  return `- **${escapeHtml(relation.label)}** (\`${relation.fieldName}\`): el formulario no muestra selector; envía \`${meta.store.importName.slice(3).replace(/^([A-Z])/, (letter) => letter.toLowerCase())}.${meta.store.idProp}\` al guardar (patrón de \`Citas.vue\`). La selección se establece desde las pantallas que comparten ese store y se limpia con \`${meta.store.limpiar}()\`. Si nadie la estableció, el botón Guardar queda desactivado hasta que se seleccione un registro.`;
+  return `- **${escapeHtml(relation.label)}** (\`${relation.fieldName}\`): el formulario no muestra selector; envía \`${meta.store.importName.slice(3).replace(/^([A-Z])/, (letter) => letter.toLowerCase())}.${meta.store.relationValueProp || meta.store.idProp}\` al guardar. La selección se establece desde las pantallas que comparten ese store y se limpia con \`${meta.store.limpiar}()\`. Si nadie la estableció, el botón Guardar queda desactivado hasta que se seleccione un registro.`;
 }).join("\n")}
 ` : ""}` : ""}
 
@@ -186,4 +191,3 @@ ${relations.length || config.pinia.enabled ? `- Las relaciones generadas siguen 
 ` : "- No se generan relaciones ni stores de Pinia; usa el paso «Relaciones y estado» del formulario si los necesitas.\n"}- Los catálogos externos para selectores, la ordenación y la exportación a PDF no se generan todavía.
 `
 }
-

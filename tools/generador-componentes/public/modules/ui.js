@@ -146,7 +146,7 @@ export function createUi(getConfiguration) {
       }
       notice.append(lead, list)
       const limitation = document.createElement("p")
-      limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (referencias ObjectId/ref y stores de Pinia) están disponibles en el paso 4 para entidades nuevas; los catálogos para selectores y el PDF siguen pendientes."
+      limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (DNI para pacientes, referencias ObjectId/ref para doctores y citas, y stores de Pinia) están disponibles en el paso 4 para entidades nuevas; los catálogos para selectores y el PDF siguen pendientes."
       notice.append(limitation)
       if (status.outputs.length) {
         const outputs = document.createElement("p")

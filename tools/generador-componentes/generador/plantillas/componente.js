@@ -14,6 +14,9 @@ function fieldControl(field) {
   const min = field.min === null ? "" : ` ${field.type === "number" || field.type === "date" ? "min" : "minlength"}="${escapeHtml(field.min)}"`
   const max = field.max === null ? "" : ` ${field.type === "number" || field.type === "date" ? "max" : "maxlength"}="${escapeHtml(field.max)}"`
   const nativePatternSupported = ["text", "email", "phone"].includes(field.type)
+  const centered = ["phone", "number", "date", "time"].includes(field.type) ||
+    /(?:id|dni|codigo|code|postal|zip)$/i.test(field.name)
+  const inputClasses = `rounded border border-gray-300 p-2${centered ? " text-center" : ""}`
   const patternAttribute = pattern && nativePatternSupported && !field.patternFlags
     ? ` pattern="${escapeHtml(pattern)}"`
     : ""
@@ -51,7 +54,7 @@ ${field.options.map((option) => `          <option value="${escapeHtml(option.va
   const numberModifier = field.type === "number" ? ".number" : ["text", "email", "phone"].includes(field.type) ? ".trim" : ""
   return `      <div class="grid gap-2">
         <label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>
-        <input id="${id}" v-model${numberModifier}="registro.${field.name}" class="rounded border border-gray-300 p-2" type="${inputType}"${required}${min}${max}${patternAttribute}>
+        <input id="${id}" v-model${numberModifier}="registro.${field.name}" class="${inputClasses}" type="${inputType}"${required}${min}${max}${patternAttribute}>
       </div>`
 }
 
@@ -128,15 +131,11 @@ export function generateComponent(config) {
 
   if (hasForm) {
     const showWhenEditing = editingOnly
-    const submitLabel = showWhenEditing
-      ? '{{ saving ? "Guardando..." : "Guardar cambios" }}'
-      : operations.has("edit")
-        ? '{{ saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear" }}'
-        : '{{ saving ? "Guardando..." : "Crear" }}'
+    const submitLabel = "Guardar"
     const piniaRequiredMissing = piniaRelations.some((relation) => relation.required)
     // Control por relación: «api» renderiza un <select> con la lista real del
-    // recurso; «pinia» muestra la selección compartida (patrón de Citas.vue,
-    // que envía pacienteStore.idPaciente en el formulario).
+    // recurso; «pinia» muestra la selección compartida. El valor enviado depende
+    // del identificador del recurso (por ejemplo, pacienteStore.dnipac).
     const relationFormControl = (relation) => {
       const meta = RESOURCE_LIBRARY[relation.resource]
       const singularLabel = meta.singularWord
@@ -146,15 +145,15 @@ export function generateComponent(config) {
         <label for="campo-${relation.fieldName}">${escapeHtml(relation.label)}${relation.required ? " *" : ""}</label>
         <select id="campo-${relation.fieldName}" v-model="registro.${relation.fieldName}" class="rounded border border-gray-300 bg-white p-2"${relation.required ? " required" : ""}>
           <option value="">Selecciona ${singularLabel}</option>
-          <option v-for="item in relacion${pascal}" :key="item._id" :value="item._id">{{ etiqueta${pascal}(item) }}</option>
+          <option v-for="item in relacion${pascal}" :key="item.${meta.relationIdField || "_id"}" :value="item.${meta.relationIdField || "_id"}">{{ etiqueta${pascal}(item) }}</option>
         </select>
       </div>`
       }
       const storeVar = storeVars.get(relation.fieldName).variable
       return `      <div class="grid gap-2 rounded border border-gray-200 bg-gray-50 p-3">
         <span class="font-medium">${escapeHtml(relation.label)}${relation.required ? " *" : ""}</span>
-        <p v-if="${storeVar}.${meta.store.idProp}" class="text-sm text-gray-700">
-          Usando la selección compartida con Pinia: {{ texto${pascal}(${storeVar}.${meta.store.idProp}) }}
+        <p v-if="${storeVar}.${meta.store.relationValueProp || meta.store.idProp}" class="text-sm text-gray-700">
+          Usando la selección compartida con Pinia: {{ texto${pascal}(${storeVar}.${meta.store.relationValueProp || meta.store.idProp}) }}
         </p>
         <p v-else class="text-sm text-red-700">
           Todavía no hay ${singularLabel} seleccionado en la pantalla que comparte el store de Pinia. Selecciónalo allí y vuelve, o cambia esta relación al modo selector de la API.
@@ -168,9 +167,9 @@ export function generateComponent(config) {
       ...relations.map((relation) => relationFormControl(relation)),
       ...fieldsInForm.map(fieldControl),
       '      <div class="flex flex-wrap gap-3">',
-      `        <button type="submit"${showWhenEditing ? ' v-if="editingId"' : ""} class="rounded bg-[#1b4965] px-5 py-2 font-semibold text-white disabled:opacity-60" :disabled="saving${piniaRequiredMissing ? " || faltanRelacionesObligatorias" : ""}">${submitLabel}</button>`,
+      `        <button type="submit"${showWhenEditing ? ' v-if="editingId"' : ""} class="rounded bg-[#1b4965] px-4 py-2 font-semibold text-white disabled:opacity-60" :disabled="saving${piniaRequiredMissing ? " || faltanRelacionesObligatorias" : ""}">${submitLabel}</button>`,
       operations.has("edit") && hasList
-        ? '        <button v-if="editingId" type="button" class="rounded border px-5 py-2" @click="limpiar">Cancelar edición</button>'
+      ? '        <button v-if="editingId" type="button" class="rounded border px-4 py-2" @click="limpiar">Cancelar</button>'
         : "",
       '      </div>',
       '    </form>'
@@ -220,12 +219,12 @@ export function generateComponent(config) {
         return `            <td class="p-3">{{ texto${pascal}(registroActual.${relation.fieldName}) }}</td>`
       }),
       type === "Detalle"
-        ? '            <td class="p-3"><button type="button" class="rounded border px-3 py-1" @click="ver(registroActual)">Ver</button></td>'
+        ? '            <td class="p-3"><button type="button" class="mx-1 rounded border px-3 py-2" @click="ver(registroActual)">Ver</button></td>'
         : showActions
-          ? `            <td class="flex gap-2 p-3">
-${ownStore ? `              <button type="button" class="rounded border px-3 py-1" :aria-pressed="${ownStore.variable}.${ownStore.idProp} === registroActual._id" :title="${ownStore.variable}.${ownStore.idProp} === registroActual._id ? 'Selección compartida' : 'Compartir esta selección con otras pantallas'" @click="compartir(registroActual)">{{ ${ownStore.variable}.${ownStore.idProp} === registroActual._id ? "Compartido" : "Compartir" }}</button>` : ""}
-${operations.has("edit") ? '              <button type="button" class="rounded border px-3 py-1" @click="editar(registroActual)">Editar</button>' : ""}
-${operations.has("delete") ? '              <button type="button" class="rounded border border-red-300 px-3 py-1 text-red-700" @click="eliminar(registroActual)">Borrar</button>' : ""}
+          ? `            <td class="p-3 text-center">
+${ownStore ? `              <button type="button" class="mx-1 rounded border px-3 py-2" :aria-pressed="${ownStore.variable}.${ownStore.idProp} === registroActual._id" title="Compartir" @click="compartir(registroActual)">Compartir</button>` : ""}
+${operations.has("edit") ? '              <button type="button" class="mx-1 rounded border px-3 py-2" @click="editar(registroActual)">Editar</button>' : ""}
+${operations.has("delete") ? '              <button type="button" class="mx-1 rounded border border-red-300 px-3 py-2 text-red-700" @click="eliminar(registroActual)">Eliminar</button>' : ""}
             </td>`
           : "",
       '          </tr>',
@@ -278,7 +277,7 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
   }
   if (hasForm) {
     script.push(
-      "// Valores con los que arranca el formulario; limpiar() vuelve a ellos tras guardar o cancelar.",
+      "// Valores con los que arranca el formulario; limpiar() vuelve a ellos al cancelar.",
       `const initialValues = ${js(initialValues)};`,
       "// reactive guarda los valores del formulario; cada control los edita con v-model=\"registro.campo\".",
       "const registro = reactive({ ...initialValues });",
@@ -321,7 +320,7 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
         "",
         `// Mapa identificador → etiqueta, recalculado cuando cambia la lista cargada.`,
         `const mapa${pascal} = computed(() =>`,
-        `  new Map(relacion${pascal}.value.map((item) => [String(item._id), etiqueta${pascal}(item)])));`,
+        `  new Map(relacion${pascal}.value.map((item) => [String(item.${meta.relationIdField || "_id"}), etiqueta${pascal}(item)])));`,
         "",
         `// Convierte el identificador guardado en la referencia en su etiqueta visible.`,
         `function texto${pascal}(id) {`,
@@ -331,7 +330,7 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
           const storeInfo = storeVars.get(relation.fieldName)
           if (!storeInfo) return []
           return [
-            `  if (String(${storeInfo.variable}.${storeInfo.store.idProp}) === valor) {`,
+            `  if (String(${storeInfo.variable}.${storeInfo.store.relationValueProp || storeInfo.store.idProp}) === valor) {`,
             `    const desdeStore = ${js(meta.displayFields)}`,
             `      .map((campo) => ${storeInfo.variable}[campo])`,
             "      .filter(Boolean)",
@@ -375,7 +374,7 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
         .filter((relation) => relation.required)
         .map((relation) => {
           const { store, variable } = storeVars.get(relation.fieldName)
-          return `!${variable}.${store.idProp}`
+          return `!${variable}.${store.relationValueProp || store.idProp}`
         })
         .join(" || ")});`,
       "",
@@ -512,10 +511,10 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
     const updateFunction = resourceDetails.apiFunctions.edit || `update${singular}`
     const patternedFields = fieldsInForm.filter((field) => field.pattern)
     const guardarBranch = operations.has("edit") && operations.has("create")
-      ? `    if (editingId.value) await ${updateFunction}(editingId.value, datos);\n    else await ${createFunction}(datos);`
+      ?       `    let guardado;\n    if (editingId.value) guardado = await ${updateFunction}(editingId.value, datos);\n    else guardado = await ${createFunction}(datos);`
       : operations.has("edit")
-        ? `    await ${updateFunction}(editingId.value, datos);`
-        : `    await ${createFunction}(datos);`
+        ? `    const guardado = await ${updateFunction}(editingId.value, datos);`
+        : `    const guardado = await ${createFunction}(datos);`
     script.push(
       "",
       "// Envía los datos del formulario a la capa API: crea un registro nuevo o guarda",
@@ -542,13 +541,16 @@ ${operations.has("delete") ? '              <button type="button" class="rounded
         ...relations.map((relation) => {
           if (relation.selection === "pinia") {
             const { store, variable } = storeVars.get(relation.fieldName)
-            return `${relation.fieldName}: ${variable}.${store.idProp} ?? registro.${relation.fieldName}`
+            return `${relation.fieldName}: ${variable}.${store.relationValueProp || store.idProp} ?? registro.${relation.fieldName}`
           }
           return `${relation.fieldName}: registro.${relation.fieldName}`
         }),
       ].join(", ")} };`,
       guardarBranch,
-      "    limpiar();",
+      "    Object.assign(registro, initialValues, guardado);",
+      operations.has("create") && operations.has("edit")
+        ? `    editingId.value = guardado.${idField};`
+        : "",
       hasList ? "    await cargar();" : "",
       '    await alertaExito("Registro guardado.");',
       "  } catch (requestError) {",

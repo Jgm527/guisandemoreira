@@ -54,7 +54,27 @@ test("genera las piezas CRUD y una ruta de salida segura", () => {
   assert.match(generated.files["src/api/tareas.js"], /encodeURIComponent\(id\)/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /titulo: registro\.titulo/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /:key="registroActual\._id"/)
+  assert.match(generated.files["src/components/GestionTareas.vue"], />Guardar<\/button>/)
+  assert.match(generated.files["src/components/GestionTareas.vue"], /Object\.assign\(registro, initialValues, guardado\)/)
+  assert.match(generated.files["src/components/GestionTareas.vue"], /editingId\.value = guardado\._id/)
+  assert.doesNotMatch(generated.files["src/components/GestionTareas.vue"], /    limpiar\(\);/)
   assert.match(generated.files["INSTRUCCIONES.md"], /backend\/server\.js/)
+})
+
+test("mantiene centrados los campos de identificación y usa acciones breves con espaciado uniforme", () => {
+  const config = validConfiguration()
+  config.fields = [
+    { name: "dni", label: "DNI", type: "text", required: true, defaultValue: "", form: true, list: true, search: false },
+    { name: "fecha", label: "Fecha", type: "date", required: true, defaultValue: "", form: true, list: true, search: false },
+  ]
+  config.operations = ["list", "create", "edit", "delete"]
+  const component = generateFiles(config).files["src/components/GestionTareas.vue"]
+  assert.match(component, /registro\.dni" class="rounded border border-gray-300 p-2 text-center"/)
+  assert.match(component, /registro\.fecha" class="rounded border border-gray-300 p-2 text-center"/)
+  assert.match(component, /Cancelar<\/button>/)
+  assert.match(component, /class="mx-1 rounded border px-3 py-2"[^>]*>Editar<\/button>/)
+  assert.match(component, />Eliminar<\/button>/)
+  assert.doesNotMatch(component, /Cancelar edición|Guardar cambios|Borrar<\/button>/)
 })
 
 test("rechaza configuraciones que podrían generar rutas inconsistentes", () => {
@@ -296,7 +316,7 @@ test("valida fechas y horas y genera límites de fecha también en Mongoose", ()
   assert.ok(validateConfiguration(config).errors.some((error) => error.includes("formato HH:MM")))
 })
 
-test("el tipo Relacionado genera referencias ObjectId, validarRelaciones y store Pinia", () => {
+test("el tipo Relacionado usa DNI para pacientes y ObjectId para doctores", () => {
   const config = validConfiguration()
   config.screen.type = "Relacionado"
   config.screen.component = "GestionRecetas"
@@ -306,7 +326,7 @@ test("el tipo Relacionado genera referencias ObjectId, validarRelaciones y store
   config.entity.plural = "recetas"
   config.entity.apiPath = "/api/recetas"
   config.relations = [
-    { resource: "pacientes", fieldName: "pacienteId", label: "Paciente", required: true, selection: "api", filterable: true },
+    { resource: "pacientes", fieldName: "pacienteDNI", label: "Paciente", required: true, selection: "api", filterable: true },
     { resource: "doctores", fieldName: "doctorId", label: "Doctor", required: true, selection: "pinia" },
   ]
   config.pinia = { enabled: true, fields: ["titulo"] }
@@ -322,16 +342,21 @@ test("el tipo Relacionado genera referencias ObjectId, validarRelaciones y store
     "src/store/recetaStore.js",
   ])
   const model = generated.files["backend/modelos/Receta.js"]
+  assert.match(model, /pacienteDNI: \{ type: String, trim: true, required: true \}/)
+  assert.match(model, /doctorId: \{ type: mongoose\.Schema\.Types\.ObjectId, ref: "Doctor", required: true \}/)
+  assert.doesNotMatch(model, /pacienteDNI: \{[^}]*ObjectId/)
   assert.match(model, /type: mongoose\.Schema\.Types\.ObjectId/)
-  assert.match(model, /ref: "Paciente"/)
   const routes = generated.files["backend/rutas/recetas.rutas.js"]
   assert.match(routes, /validarRelaciones/)
-  assert.match(routes, /Paciente\.exists/)
-  assert.match(routes, /filtros\.pacienteId/)
+  assert.match(routes, /Paciente\.exists\(\{ dnipac: datos\.pacienteDNI \}\)/)
+  assert.match(routes, /filtros\.pacienteDNI/)
+  assert.match(routes, /trim\(\)\.toUpperCase\(\)/)
   const component = generated.files["src/components/GestionRecetas.vue"]
   assert.match(component, /getPacientes/)
+  assert.match(component, /:value="item\.dnipac"/)
+  assert.match(component, /new Map\(relacionPacienteDNI\.value\.map\(\(item\) => \[String\(item\.dnipac\)/)
   assert.match(component, /useDoctorStore/)
-  assert.match(component, /etiquetaPacienteId\(item\)/)
+  assert.match(component, /etiquetaPacienteDNI\(item\)/)
   assert.match(component, /compartir\(registroActual\)/)
   const parsed = parse(component, { filename: "GestionRecetas.vue" })
   assert.deepEqual(parsed.errors, [])
@@ -346,6 +371,20 @@ test("el tipo Relacionado genera referencias ObjectId, validarRelaciones y store
   assert.match(generated.files["INSTRUCCIONES.md"], /seleccionarReceta/)
 })
 
+test("la relación Pinia con pacientes guarda el DNI seleccionado", () => {
+  const config = validConfiguration()
+  config.screen.type = "Relacionado"
+  config.relations = [
+    { resource: "pacientes", fieldName: "pacienteDNI", label: "Paciente", required: true, selection: "pinia" },
+  ]
+  const generated = generateFiles(config)
+  const component = generated.files["src/components/GestionTareas.vue"]
+  const model = generated.files["backend/modelos/Tarea.js"]
+  assert.match(component, /pacienteStore\.dnipac/)
+  assert.match(component, /pacienteDNI: pacienteStore\.dnipac \?\? registro\.pacienteDNI/)
+  assert.match(model, /pacienteDNI: \{ type: String, trim: true, required: true \}/)
+})
+
 test("rechaza configuraciones de relación incoherentes", () => {
   const config = validConfiguration()
   config.screen.type = "Relacionado"
@@ -358,7 +397,7 @@ test("rechaza configuraciones de relación incoherentes", () => {
   assert.ok(result.errors.some((error) => error.includes("al menos una relación")))
 
   config.screen.type = "Listado"
-  config.relations = [{ resource: "pacientes", fieldName: "pacienteId", label: "Paciente", selection: "api" }]
+  config.relations = [{ resource: "pacientes", fieldName: "pacienteDNI", label: "Paciente", selection: "api" }]
   result = validateConfiguration(config)
   assert.ok(result.errors.some((error) => error.includes("CRUD, Relacionado y Formulario")))
 

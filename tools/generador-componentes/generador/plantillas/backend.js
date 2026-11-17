@@ -64,6 +64,12 @@ function mongooseField(field) {
 
 function mongooseRelationField(relation) {
   const meta = RESOURCE_LIBRARY[relation.resource]
+  if (meta.relationIdField) {
+    const properties = ["type: String", "trim: true"]
+    if (relation.required) properties.push("required: true")
+    return `    // Relación con ${meta.label.toLowerCase()} mediante su identificador público ${meta.relationIdField}.
+    ${relation.fieldName}: { ${properties.join(", ")} },`
+  }
   const properties = [
     "type: mongoose.Schema.Types.ObjectId",
     `ref: ${js(meta.refModel)}`,
@@ -147,7 +153,18 @@ export function generateRoutes(config) {
       `// cadena vacía cuando todas son válidas (mismo patrón que citas.rutas.js).`,
       "async function validarRelaciones(datos) {",
       ...relations.map((relation) => {
-        const model = RESOURCE_LIBRARY[relation.resource].refModel
+        const meta = RESOURCE_LIBRARY[relation.resource]
+        if (meta.relationIdField) {
+          return [
+            `  if (datos.${relation.fieldName}) {`,
+            `    datos.${relation.fieldName} = String(datos.${relation.fieldName}).trim().toUpperCase();`,
+            `    if (!(await ${meta.refModel}.exists({ ${meta.relationIdField}: datos.${relation.fieldName} }))) {`,
+            `      return "El ${meta.singularWord} seleccionado no existe";`,
+            "    }",
+            "  }",
+          ].join("\n")
+        }
+        const model = meta.refModel
         return [
           `  if (datos.${relation.fieldName} && !(await ${model}.exists({ _id: datos.${relation.fieldName} }))) {`,
           `    return "El ${RESOURCE_LIBRARY[relation.resource].singularWord} seleccionado no existe";`,
@@ -164,13 +181,15 @@ export function generateRoutes(config) {
     if (filterRelations.length) {
       lines.push(
         "// GET /: devuelve los documentos; admite filtrar por las relaciones indicadas,",
-        "// por ejemplo GET /api/" + slugify(plural) + "?pacienteId=...",
+        "// por ejemplo GET /api/" + slugify(plural) + "?pacienteDNI=...",
         "router.get(\"/\", async (req, res) => {",
         "  try {",
         "    const filtros = {};",
         ...filterRelations.map((relation) => [
           `    if (req.query.${relation.fieldName}) {`,
-          `      filtros.${relation.fieldName} = req.query.${relation.fieldName};`,
+          `      filtros.${relation.fieldName} = ${RESOURCE_LIBRARY[relation.resource].relationIdField
+    ? `String(req.query.${relation.fieldName}).trim().toUpperCase()`
+    : `req.query.${relation.fieldName}`};`,
           "    }",
         ].join("\n")),
         `    res.json(await ${singular}.find(filtros).lean());`,

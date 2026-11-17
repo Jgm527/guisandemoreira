@@ -27,11 +27,13 @@ export const RESOURCE_LIBRARY = {
     // Datos para las relaciones: nombre del modelo Mongoose real, campos con los
     // que se muestra cada registro en un selector y store de Pinia existente.
     refModel: "Paciente",
-    displayFields: ["nomepac", "apeldoc"],
+    displayFields: ["nomepac", "apelpac"],
+    relationIdField: "dnipac",
     store: {
       file: "pacienteStore.js",
       importName: "usepacienteStore",
       idProp: "idPaciente",
+      relationValueProp: "dnipac",
       seleccionar: "seleccionarPaciente",
       limpiar: "limpiarPaciente",
     },
@@ -46,7 +48,7 @@ export const RESOURCE_LIBRARY = {
       "backend/modelos/Paciente.js",
       "backend/rutas/pacientes.rutas.js",
     ],
-    notes: "Los pacientes se identifican por el campo dnipac (DNI), no por _id. Si la pantalla crea o edita pacientes, incluye dnipac entre los campos del formulario y revisa backend/rutas/pacientes.rutas.js.",
+    notes: "La API identifica a los pacientes por el DNI en dnipac; al crear relaciones con pacientes, se guarda ese DNI como texto y se valida contra Paciente.dnipac. El documento también conserva su _id de MongoDB.",
   },
   doctores: {
     apiFile: "doctores.js",
@@ -61,6 +63,7 @@ export const RESOURCE_LIBRARY = {
       file: "doctorStore.js",
       importName: "useDoctorStore",
       idProp: "idDoctor",
+      relationValueProp: "idDoctor",
       seleccionar: "seleccionarDoctor",
       limpiar: "limpiarDoctor",
     },
@@ -75,7 +78,7 @@ export const RESOURCE_LIBRARY = {
       "backend/modelos/Doctor.js",
       "backend/rutas/doctores.rutas.js",
     ],
-    notes: "El backend de doctores localiza cada documento por el campo iddoc; las pantallas reales del proyecto (XestionDoctores.vue) envían doctor._id en la URL y funcionan porque iddoc guarda el mismo valor. Comprueba ese detalle en backend/rutas/doctores.rutas.js antes de editar o borrar registros antiguos.",
+    notes: "El backend de doctores localiza los documentos por su _id de MongoDB. La especialidad se guarda en el campo espedoc.",
   },
   citas: {
     apiFile: "citas.js",
@@ -99,7 +102,7 @@ export const RESOURCE_LIBRARY = {
       "backend/modelos/Cita.js",
       "backend/rutas/citas.rutas.js",
     ],
-    notes: "Las citas guardan referencias a otros documentos (pacienteId y doctorId). Para crearlas con la API real necesitas identificadores válidos de paciente y doctor; esta versión no genera los selectores de catálogo necesarios.",
+    notes: "Las citas guardan pacienteDNI como texto (el DNI del paciente) y doctorId como ObjectId del doctor. El DNI se valida contra Paciente.dnipac.",
   },
   especialidades: {
     apiFile: "especialidades.js",
