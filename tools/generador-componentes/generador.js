@@ -870,7 +870,9 @@ function generateInstructions(config) {
 
 Se generó una pantalla **${type}** para **${title}**, con operaciones para ${operationsText}. La colección nueva se llamará \`${plural}\`, la API estará en \`${apiPath}\` y MongoDB usará \`_id\` como identificador.
 
-Esta herramienta solo guarda los archivos en su carpeta de salida. No modifica ni ejecuta el proyecto.
+Esta herramienta solo guarda los archivos en su carpeta de salida. No modifica ni ejecuta el proyecto y no se monta ni se registra automáticamente en la app real.
+
+La integración en backend/server.js, src/router/index.js y src/components/NavBar.vue requiere pasos manuales y revisión de los nombres reales de campos y rutas del proyecto.
 
 ## Archivos generados
 
@@ -914,6 +916,7 @@ ${menuFragment}
 - El identificador de MongoDB es siempre \`_id\`; no se generan identificadores de negocio.
 - La búsqueda se hace en memoria sobre los registros ya cargados, no en MongoDB.
 - No se generan relaciones, stores Pinia, catálogos externos, filtros avanzados, ordenación ni exportación PDF.
+- Los tipos Listado, Detalle, Formulario y Relacionado se soportan cuando la validación y la configuración lo permiten; si un caso requiere relaciones o catálogos más complejos, debe completarse manualmente.
 - La reutilización de recursos existentes queda soportada cuando se elige ese origen; en ese caso la herramienta no duplica backend.
 - Las restricciones se limitan a las opciones configurables del formulario y al esquema Mongoose generado; revisa las reglas específicas de negocio antes de integrar.
 `

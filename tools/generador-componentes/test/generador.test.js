@@ -183,6 +183,12 @@ test("permite generar tipos de pantalla distintos de CRUD en la misma plantilla"
   assert.match(formGenerated.files["src/components/GestionTareas.vue"], /@submit.prevent="guardar"/)
 })
 
+test("indica claramente que la salida no se registra automáticamente en la app real", () => {
+  const generated = generateFiles(validConfiguration())
+  assert.match(generated.files["INSTRUCCIONES.md"], /no se monta ni se registra automáticamente/i)
+  assert.match(generated.files["INSTRUCCIONES.md"], /src\/router\/index\.js/i)
+})
+
 test("permite generar una pantalla que reutiliza un recurso existente sin duplicar backend", () => {
   const config = validConfiguration()
   config.source = "existing"
