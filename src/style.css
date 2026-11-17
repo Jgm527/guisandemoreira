@@ -37,6 +37,15 @@
 
 /* Componentes compartidos: formularios/tablas, citas y adaptacion a pantallas pequenas. */
 @layer components {
+  form input[type="date"],
+  form input[type="time"],
+  form input[type="number"],
+  form input[type="tel"],
+  form input[inputmode="numeric"],
+  form input[type="text"]:disabled {
+    text-align: center;
+  }
+
   /* Reglas de la gestion de pacientes y doctores. */
   .xestion-pacientes {
     @apply box-border w-full min-w-0 rounded-lg bg-white p-8 shadow-[0_2px_10px_rgba(0,0,0,0.05)];
@@ -310,6 +319,10 @@
 
   .xestion-citas .citas-campo label {
     @apply font-medium;
+  }
+
+  .xestion-citas .centrado {
+    @apply text-center;
   }
 
   .xestion-citas .citas-campo input,

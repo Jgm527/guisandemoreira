@@ -4,7 +4,7 @@
     <h4>🗓️ Xestión de citas</h4>
 
     <p
-      v-if="!pacienteStore.idPaciente && !doctorStore.idDoctor"
+      v-if="!pacienteStore.dnipac && !doctorStore.idDoctor"
       class="citas-aviso"
     >
       Selecciona un paciente o un doctor en su pestaña para consultar sus citas.
@@ -12,7 +12,7 @@
 
     <template v-else>
       <p
-        v-if="!pacienteStore.idPaciente || !doctorStore.idDoctor"
+        v-if="!pacienteStore.dnipac || !doctorStore.idDoctor"
         class="citas-aviso"
       >
         Puedes consultar las citas con una selección. Para crear o editar una cita,
@@ -31,6 +31,7 @@
             <input
               id="id-cita"
               :value="cita._id || 'Se genera al guardar'"
+              class="centrado"
               type="text"
               disabled
             >
@@ -60,18 +61,19 @@
             <label for="paciente-cita">Paciente:</label>
             <select
               id="paciente-cita"
-              :value="pacienteStore.idPaciente || ''"
+              class="centrado"
+              :value="pacienteStore.dnipac || ''"
               disabled
             >
               <option
-                v-if="!pacienteStore.idPaciente"
+                v-if="!pacienteStore.dnipac"
                 value=""
               >
                 Selecciona un paciente en su pestaña
               </option>
               <option
                 v-else
-                :value="pacienteStore.idPaciente"
+                :value="pacienteStore.dnipac"
               >
                 {{ pacienteStore.nomepac }} {{ pacienteStore.apelpac }} — {{ pacienteStore.dnipac }}
               </option>
@@ -254,7 +256,7 @@
               :key="item._id"
             >
               <td>{{ item.fecha }} · {{ item.hora }}</td>
-              <td>{{ nombrePaciente(item.pacienteId) }}</td>
+              <td>{{ nombrePaciente(item.pacienteDNI) }}</td>
               <td>{{ nombreDoctor(item.doctorId) }}</td>
               <td>{{ item.motivo }}</td>
               <td>{{ etiquetaEstado(item.estado) }}</td>
@@ -318,7 +320,7 @@ const doctorStore = useDoctorStore()
 // Fabrica valores iniciales para reutilizar el mismo formulario en altas y ediciones.
 const citaVacia = () => ({
   _id: "",
-  pacienteId: "",
+  pacienteDNI: "",
   doctorId: "",
   fecha: "",
   hora: "",
@@ -342,7 +344,7 @@ const formularioValido = computed(() =>
   Boolean(
     cita.fecha &&
     cita.hora &&
-    pacienteStore.idPaciente &&
+    pacienteStore.dnipac &&
     doctorStore.idDoctor &&
     cita.motivo.trim() &&
     cita.estado
@@ -351,28 +353,28 @@ const formularioValido = computed(() =>
 
 // Al abrir la pantalla basta con que haya un paciente o un doctor seleccionado.
 onMounted(async () => {
-  if (pacienteStore.idPaciente || doctorStore.idDoctor) {
+  if (pacienteStore.dnipac || doctorStore.idDoctor) {
     await cargarDatos()
   }
 })
 
 // Si cambia cualquiera de las selecciones, se descarta el formulario y la lista anterior.
-watch(() => [pacienteStore.idPaciente, doctorStore.idDoctor], async ([idPaciente, idDoctor]) => {
+watch(() => [pacienteStore.dnipac, doctorStore.idDoctor], async ([dniPaciente, idDoctor]) => {
   citas.value = []
   pacientes.value = []
   doctores.value = []
   limpiarFormulario()
 
-  if (idPaciente || idDoctor) {
+  if (dniPaciente || idDoctor) {
     await cargarDatos()
   }
 })
 
 // Refresca citas y catalogos, filtrando por cada seleccion que exista en Pinia.
 async function cargarDatos() {
-  const idPaciente = pacienteStore.idPaciente
+  const dniPaciente = pacienteStore.dnipac
   const idDoctor = doctorStore.idDoctor
-  if (!idPaciente && !idDoctor) {
+  if (!dniPaciente && !idDoctor) {
     citas.value = []
     pacientes.value = []
     doctores.value = []
@@ -385,14 +387,14 @@ async function cargarDatos() {
     // Los catalogos permiten mostrar el nombre de la otra persona aunque solo
     // se haya seleccionado paciente o doctor en su pestaña.
     const [listaCitas, listaPacientes, listaDoctores] = await Promise.all([
-      getCitas({ pacienteId: idPaciente, doctorId: idDoctor }),
+      getCitas({ pacienteDNI: dniPaciente, doctorId: idDoctor }),
       getPacientes(),
       getDoctores()
     ])
 
     // Ignora una respuesta tardia si entretanto cambio cualquiera de las selecciones.
     if (
-      String(pacienteStore.idPaciente) !== String(idPaciente) ||
+      String(pacienteStore.dnipac) !== String(dniPaciente) ||
       String(doctorStore.idDoctor) !== String(idDoctor)
     ) {
       return
@@ -400,7 +402,7 @@ async function cargarDatos() {
 
     // Verifica tambien en el cliente los filtros, por si el backend activo aun no se reinicio.
     citas.value = listaCitas.filter((item) =>
-      (!idPaciente || idRelacionado(item.pacienteId) === String(idPaciente)) &&
+      (!dniPaciente || normalizarDNI(item.pacienteDNI) === normalizarDNI(dniPaciente)) &&
       (!idDoctor || idRelacionado(item.doctorId) === String(idDoctor))
     )
     pacientes.value = listaPacientes
@@ -413,15 +415,17 @@ async function cargarDatos() {
 }
 
 async function exportarCitas() {
-  const paciente = pacientes.value.find(
-    (item) => String(item._id) === String(pacienteStore.idPaciente)
-  )
+  const paciente = pacienteStore.dnipac
+    ? pacientes.value.find(
+      (item) => normalizarDNI(item.dnipac) === normalizarDNI(pacienteStore.dnipac)
+    )
+    : null
   const doctor = doctores.value.find(
     (item) => String(item._id) === String(doctorStore.idDoctor)
   )
   const filtros = []
 
-  if (pacienteStore.idPaciente) {
+  if (pacienteStore.dnipac) {
     const nombre = paciente
       ? `${paciente.nomepac} ${paciente.apelpac}`
       : `${pacienteStore.nomepac} ${pacienteStore.apelpac}`
@@ -442,7 +446,7 @@ async function exportarCitas() {
       filas: citas.value.map((item) => [
         item.fecha ?? "",
         item.hora ?? "",
-        nombrePaciente(item.pacienteId),
+        nombrePaciente(item.pacienteDNI),
         nombreDoctor(item.doctorId),
         item.motivo ?? "",
         etiquetaEstado(item.estado),
@@ -458,7 +462,7 @@ async function exportarCitas() {
 // Para crear o editar el backend exige ambos identificadores, aunque el listado
 // pueda consultarse filtrando solo por una de las dos selecciones.
 async function guardarCita() {
-  if (!pacienteStore.idPaciente || !doctorStore.idDoctor || !formularioValido.value) {
+  if (!pacienteStore.dnipac || !doctorStore.idDoctor || !formularioValido.value) {
     return
   }
 
@@ -466,7 +470,7 @@ async function guardarCita() {
 
   // Solo envia campos aceptados por el modelo y normaliza texto libre con trim().
   const datosCita = {
-    pacienteId: pacienteStore.idPaciente,
+    pacienteDNI: pacienteStore.dnipac,
     doctorId: doctorStore.idDoctor,
     fecha: cita.fecha,
     hora: cita.hora,
@@ -498,7 +502,7 @@ async function guardarCita() {
 function editarCita(item) {
   Object.assign(cita, citaVacia(), {
     ...item,
-    pacienteId: idRelacionado(item.pacienteId),
+    pacienteDNI: String(item.pacienteDNI ?? ""),
     doctorId: idRelacionado(item.doctorId),
     observacions: item.observacions ?? "",
     estado: item.estado ?? "pendente"
@@ -543,18 +547,26 @@ function limpiarSeleccion() {
 }
 
 // Busca el paciente relacionado en el catálogo, con el store como respaldo.
-function nombrePaciente(pacienteId) {
-  const id = idRelacionado(pacienteId)
-  const paciente = pacientes.value.find((item) => String(item._id) === id)
+function nombrePaciente(pacienteDNI) {
+  const dni = normalizarDNI(pacienteDNI)
+  if (!dni) {
+    return "Paciente no disponible"
+  }
+
+  const paciente = pacientes.value.find((item) => normalizarDNI(item.dnipac) === dni)
   if (paciente) {
     return `${paciente.nomepac} ${paciente.apelpac}`
   }
 
-  if (String(pacienteStore.idPaciente) === id) {
+  if (normalizarDNI(pacienteStore.dnipac) === dni) {
     return `${pacienteStore.nomepac} ${pacienteStore.apelpac}`
   }
 
   return "Paciente no disponible"
+}
+
+function normalizarDNI(dni) {
+  return String(dni ?? "").trim().toUpperCase()
 }
 
 // Resuelve el identificador de doctor a su nombre para mostrarlo en la tabla.

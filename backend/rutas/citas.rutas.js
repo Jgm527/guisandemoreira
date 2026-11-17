@@ -8,7 +8,7 @@ const router = express.Router()
 
 // Lista blanca de propiedades que se aceptan al crear o editar una cita.
 const camposCita = [
-    "pacienteId",
+    "pacienteDNI",
     "doctorId",
     "fecha",
     "hora",
@@ -28,10 +28,13 @@ function datosPermitidos(body) {
     )
 }
 
-// Comprueba que las referencias de paciente y doctor apunten a documentos existentes.
+// Comprueba que el DNI y el identificador de doctor correspondan a registros existentes.
 async function validarRelaciones(datos) {
-    if (datos.pacienteId && !(await Paciente.exists({ _id: datos.pacienteId }))) {
-        return "El paciente seleccionado no existe"
+    if (datos.pacienteDNI) {
+        datos.pacienteDNI = String(datos.pacienteDNI).trim().toUpperCase()
+        if (!(await Paciente.exists({ dnipac: datos.pacienteDNI }))) {
+            return "El paciente seleccionado no existe"
+        }
     }
 
     if (datos.doctorId && !(await Doctor.exists({ _id: datos.doctorId }))) {
@@ -41,13 +44,13 @@ async function validarRelaciones(datos) {
     return ""
 }
 
-// GET /api/citas: filtra por las relaciones recibidas y ordena cronologicamente.
+// GET /api/citas: filtra por DNI de paciente y doctor, y ordena cronologicamente.
 router.get("/", async (req, res) => {
     try {
         // Los filtros simultaneos se combinan con AND para devolver la interseccion.
         const filtros = {}
-        if (req.query.pacienteId) {
-            filtros.pacienteId = req.query.pacienteId
+        if (req.query.pacienteDNI) {
+            filtros.pacienteDNI = String(req.query.pacienteDNI).trim().toUpperCase()
         }
         if (req.query.doctorId) {
             filtros.doctorId = req.query.doctorId
@@ -58,7 +61,7 @@ router.get("/", async (req, res) => {
         res.json(citas)
     } catch (error) {
         if (error.name === "CastError") {
-            return res.status(400).json({ mensaje: "El ID de paciente o doctor no es válido" })
+            return res.status(400).json({ mensaje: "El ID del doctor no es válido" })
         }
 
         console.error("Error al listar las citas:", error)

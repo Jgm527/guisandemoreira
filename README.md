@@ -120,8 +120,8 @@ No hace falta inventar una estructura nueva: se puede replicar adaptando los nom
 Ejemplos reales de este repositorio:
 
 - [src/store/doctorStore.js](./src/store/doctorStore.js) y [src/store/pacienteStore.js](./src/store/pacienteStore.js) muestran selección y limpieza de datos compartidos.
-- [src/components/Citas.vue](./src/components/Citas.vue) lee esos stores y usa sus identificadores para filtrar y guardar citas.
-- [backend/modelos/Cita.js](./backend/modelos/Cita.js) y [backend/rutas/citas.rutas.js](./backend/rutas/citas.rutas.js) muestran referencias MongoDB y comprobación de relaciones.
+- [src/components/Citas.vue](./src/components/Citas.vue) lee esos stores y usa el DNI del paciente y el identificador del doctor para filtrar y guardar citas.
+- [backend/modelos/Cita.js](./backend/modelos/Cita.js) y [backend/rutas/citas.rutas.js](./backend/rutas/citas.rutas.js) muestran el DNI del paciente y la comprobación de las relaciones de la cita.
 
 Pinia no sustituye MongoDB: los valores del store se pierden al recargar, salvo que se programe persistencia; este repositorio no la configura.
 

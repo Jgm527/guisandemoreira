@@ -484,9 +484,9 @@ La aplicación registra Pinia en `src/main.js`; por eso se puede usar desde cual
 
 ### Cómo se relaciona esto con MongoDB en las citas
 
-En `backend/modelos/Cita.js`, `pacienteId` y `doctorId` son `ObjectId` con `ref` a los modelos `Paciente` y `Doctor`. Eso significa que la cita guarda los identificadores de los documentos, no una copia completa de cada paciente o doctor.
+En `backend/modelos/Cita.js`, `pacienteDNI` guarda el DNI del paciente como texto y `doctorId` guarda el `ObjectId` del doctor. La ruta comprueba que el DNI corresponda a un paciente existente y que el identificador corresponda a un doctor existente.
 
-La selección en Pinia ayuda al componente a saber qué persona eligió el usuario. Al guardar, la pantalla envía los identificadores a la API; `backend/rutas/citas.rutas.js` comprueba que los documentos existan antes de guardar. La cita queda persistida en MongoDB. Pinia **no** reemplaza esa validación ni guarda la cita.
+La selección en Pinia ayuda al componente a saber qué persona eligió el usuario. Al guardar, la pantalla envía el DNI del paciente y el identificador del doctor a la API; `backend/rutas/citas.rutas.js` comprueba que ambos correspondan a registros existentes antes de guardar. La cita queda persistida en MongoDB. Pinia **no** reemplaza esa validación ni guarda la cita.
 
 ## 9. Qué significa “usar MongoDB” paso a paso
 

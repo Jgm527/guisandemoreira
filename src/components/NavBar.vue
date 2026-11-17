@@ -23,6 +23,14 @@
         <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/">Inicio</RouterLink>
       </li>
       <li>
+        <RouterLink
+          class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]"
+          to="/servicios"
+        >
+          Servicios
+        </RouterLink>
+      </li>
+      <li>
         <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/xestionPacientes">Pacientes</RouterLink>
       </li>
       <li>
@@ -30,9 +38,6 @@
       </li>
       <li>
         <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/citas">Citas</RouterLink>
-      </li>
-      <li>
-        <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/tarefas">Tarefas</RouterLink>
       </li>
       <li>
         <RouterLink class="font-medium text-white no-underline transition-colors hover:text-[#ffe66d] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#ffe66d] [&.router-link-active]:border-b-[0.2rem] [&.router-link-active]:border-[#ffe66d]" to="/sobrenos">Sobre nós</RouterLink>
