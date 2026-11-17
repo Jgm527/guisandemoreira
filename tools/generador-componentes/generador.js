@@ -11,50 +11,108 @@ const FIELD_TYPES = new Set([
   "select",
 ])
 
+// Recursos reales del proyecto que la herramienta puede reutilizar. Cada entrada
+// indica el módulo de src/api/ que existe de verdad, las funciones que exporta de
+// verdad (revisadas en los archivos), el campo por el que el backend localiza los
+// documentos y los archivos de referencia que conviene leer antes de integrar.
 const RESOURCE_LIBRARY = {
   pacientes: {
     apiFile: "pacientes.js",
-    list: "getPacientes",
-    create: "savePaciente",
-    edit: "modifyPaciente",
-    delete: "deletePaciente",
-    apiPath: "/api/pacientes",
     label: "Pacientes",
+    singular: "Paciente",
+    apiPath: "/api/pacientes",
+    // El backend de pacientes busca, edita y borra por DNI (dnipac), no por _id.
+    idField: "dnipac",
+    apiFunctions: {
+      list: "getPacientes",
+      create: "savePaciente",
+      edit: "modifyPaciente",
+      delete: "deletePaciente",
+    },
+    referenceFiles: [
+      "src/api/pacientes.js",
+      "backend/modelos/Paciente.js",
+      "backend/rutas/pacientes.rutas.js",
+    ],
+    notes: "Los pacientes se identifican por el campo dnipac (DNI), no por _id. Si la pantalla crea o edita pacientes, incluye dnipac entre los campos del formulario y revisa backend/rutas/pacientes.rutas.js.",
   },
   doctores: {
     apiFile: "doctores.js",
-    list: "getDoctores",
-    create: "saveDoctor",
-    edit: "modifyDoctor",
-    delete: "deleteDoctor",
-    apiPath: "/api/doctores",
     label: "Doctores",
+    singular: "Doctor",
+    apiPath: "/api/doctores",
+    idField: "_id",
+    apiFunctions: {
+      list: "getDoctores",
+      create: "saveDoctor",
+      edit: "modifyDoctor",
+      delete: "deleteDoctor",
+    },
+    referenceFiles: [
+      "src/api/doctores.js",
+      "backend/modelos/Doctor.js",
+      "backend/rutas/doctores.rutas.js",
+    ],
+    notes: "El backend de doctores localiza cada documento por el campo iddoc; las pantallas reales del proyecto (XestionDoctores.vue) envían doctor._id en la URL y funcionan porque iddoc guarda el mismo valor. Comprueba ese detalle en backend/rutas/doctores.rutas.js antes de editar o borrar registros antiguos.",
   },
   citas: {
     apiFile: "citas.js",
-    list: "getCitas",
-    create: "saveCita",
-    edit: "updateCita",
-    delete: "deleteCita",
-    apiPath: "/api/citas",
     label: "Citas",
+    singular: "Cita",
+    apiPath: "/api/citas",
+    idField: "_id",
+    apiFunctions: {
+      list: "getCitas",
+      create: "saveCita",
+      edit: "updateCita",
+      delete: "deleteCita",
+    },
+    referenceFiles: [
+      "src/api/citas.js",
+      "backend/modelos/Cita.js",
+      "backend/rutas/citas.rutas.js",
+    ],
+    notes: "Las citas guardan referencias a otros documentos (pacienteId y doctorId). Para crearlas con la API real necesitas identificadores válidos de paciente y doctor; esta versión no genera los selectores de catálogo necesarios.",
   },
   especialidades: {
     apiFile: "especialidades.js",
-    list: "obtenerEspecialidades",
-    apiPath: "/api/especialidades",
     label: "Especialidades",
+    singular: "Especialidad",
+    apiPath: "/api/especialidades",
+    idField: "",
+    catalogOnly: true,
+    apiFunctions: {
+      list: "obtenerEspecialidades",
+    },
+    referenceFiles: [
+      "src/api/especialidades.js",
+      "backend/data/especialidades.json",
+    ],
+    notes: "Es un catálogo de solo lectura: solo existe la operación listar, así que sirve para consultar o filtrar, no para crear registros.",
   },
   municipios: {
     apiFile: "municipios.js",
-    list: "obtenerProvincias",
-    apiPath: "/api/municipios",
     label: "Municipios",
+    singular: "Municipio",
+    apiPath: "/api/municipios",
+    idField: "",
+    catalogOnly: true,
+    apiFunctions: {
+      list: "obtenerProvincias",
+    },
+    referenceFiles: [
+      "src/api/municipios.js",
+      "backend/data/municipios.json",
+    ],
+    notes: "Es un catálogo de solo lectura: la API devuelve las provincias y, con obtenerMunicipios(provincia), sus municipios. La versión generada solo lista; los selectores dependientes quedan fuera.",
   },
 }
 
 const OPERATIONS = new Set(["list", "create", "edit", "delete", "search"])
-const SCREEN_TYPES = new Set(["CRUD", "Listado", "Detalle", "Formulario", "Relacionado"])
+// Relacionado queda fuera de esta versión: exigiría generar relaciones con otras
+// entidades y stores de Pinia que no existen, y la especificación prohíbe fingir
+// que una función funciona cuando no lo hace.
+const SCREEN_TYPES = new Set(["CRUD", "Listado", "Detalle", "Formulario"])
 const RESERVED_FIELDS = new Set(["_id", "id", "__proto__", "constructor", "prototype"])
 
 const escapeHtml = (value) => String(value)
@@ -145,8 +203,10 @@ export function validateConfiguration(input) {
     : []
   const fields = Array.isArray(input.fields) ? input.fields.map(normalizeField) : []
 
-  if (!SCREEN_TYPES.has(String(screen.type ?? ""))) {
-    errors.push("Selecciona un tipo de pantalla válido: CRUD, Listado, Detalle, Formulario o Relacionado.")
+  if (String(screen.type ?? "") === "Relacionado") {
+    errors.push("El tipo Relacionado todavía no está disponible: esta versión no genera relaciones con otras entidades ni stores de Pinia y no debe fingir que sí.")
+  } else if (!SCREEN_TYPES.has(String(screen.type ?? ""))) {
+    errors.push("Selecciona un tipo de pantalla válido: CRUD, Listado, Detalle o Formulario.")
   }
   if (String(screen.title ?? "").trim().length < 2 || String(screen.title ?? "").trim().length > 120) {
     errors.push("El nombre visible de la pantalla debe tener entre 2 y 120 caracteres.")
@@ -173,6 +233,20 @@ export function validateConfiguration(input) {
       }
       if (String(entity.singular ?? "").trim() && !isValidPascalCase(String(entity.singular ?? ""))) {
         errors.push("El nombre singular del recurso existente debe seguir el formato PascalCase.")
+      }
+      if (String(entity.plural ?? "").trim() && !/^[a-z][a-z0-9]*$/.test(String(entity.plural ?? ""))) {
+        errors.push("El nombre plural del recurso existente debe estar en minúsculas, empezar por letra y usar solo letras y números.")
+      }
+      // La especificación prohíbe deducir endpoints: solo se admiten las operaciones
+      // que el módulo real de src/api/ exporta (search es filtrado local, no backend).
+      const operationLabels = { list: "listar", create: "crear", edit: "editar", delete: "borrar", search: "buscar" }
+      const unsupportedOperations = operations.filter((operation) => operation !== "search" && !resourceMeta.apiFunctions[operation])
+      if (unsupportedOperations.length) {
+        const available = Object.keys(resourceMeta.apiFunctions)
+          .map((operation) => operationLabels[operation] ?? operation)
+          .join(", ")
+        const requested = unsupportedOperations.map((operation) => operationLabels[operation] ?? operation).join(", ")
+        errors.push(`El recurso ${existingResource} solo ofrece estas operaciones reales: ${available}. No tiene ${requested}; quítala o revisa src/api/${resourceMeta.apiFile} antes de pedirla.`)
       }
     }
   } else {
@@ -206,6 +280,16 @@ export function validateConfiguration(input) {
   }
   if (String(screen.type ?? "") === "Formulario" && !(operations.includes("create") || operations.includes("edit"))) {
     errors.push("Las pantallas de tipo Formulario requieren crear o editar.")
+  }
+  if (String(screen.type ?? "") === "Formulario" && operations.includes("edit") && !operations.includes("create")) {
+    errors.push("Una pantalla de tipo Formulario que edita necesita también crear: para editar registros existentes elige el tipo CRUD.")
+  }
+  if (String(screen.type ?? "") === "Formulario" && operations.includes("delete")) {
+    errors.push("Las pantallas de tipo Formulario no borran registros; elige el tipo CRUD para combinar formulario y tabla.")
+  }
+  if (String(screen.type ?? "") === "Detalle" &&
+      operations.some((operation) => !["list", "search"].includes(operation))) {
+    errors.push("Las pantallas de tipo Detalle solo muestran un registro: elige listar (y opcionalmente buscar), sin crear, editar ni borrar.")
   }
   if (["Listado", "Detalle"].includes(String(screen.type ?? "")) && !operations.includes("list")) {
     errors.push("Las pantallas de tipo Listado o Detalle necesitan la operación listar.")
@@ -356,10 +440,12 @@ export function validateConfiguration(input) {
       menuLabel: String(screen.menuLabel ?? "").trim(),
     },
     entity: {
-      singular: String(entity.singular ?? "").trim() || (resourceMeta ? String(resourceMeta.label).replace(/s$/, "") : ""),
+      singular: String(entity.singular ?? "").trim() || (resourceMeta ? resourceMeta.singular : ""),
       plural: String(entity.plural ?? "").trim() || (resourceMeta ? existingResource : ""),
       apiPath: String(entity.apiPath ?? "").trim() || (resourceMeta ? resourceMeta.apiPath : ""),
-      idField: "_id",
+      // Los recursos reales pueden identificarse por otro campo (por ejemplo dnipac);
+      // las entidades nuevas siempre usan el _id automático de Mongoose.
+      idField: resourceMeta ? (resourceMeta.idField || "_id") : "_id",
     },
     fields,
     operations: operations.filter((operation) => OPERATIONS.has(operation)),
@@ -434,7 +520,11 @@ function mongooseField(field) {
 
 function generateModel(config) {
   const { singular, plural } = config.entity
-  return `import mongoose from "mongoose";
+  return `// Dónde va: backend/modelos/${singular}.js
+// Qué es: el «modelo» ${singular}. Un esquema Mongoose declara los campos de cada
+// documento de la colección ${plural}, cuáles son obligatorios y sus validaciones;
+// el backend usa este modelo en las rutas para consultar y guardar datos.
+import mongoose from "mongoose";
 
 // Este esquema describe los campos y validaciones de cada documento ${singular}.
 const ${singular}Schema = new mongoose.Schema(
@@ -453,10 +543,20 @@ export default mongoose.model(${js(singular)}, ${singular}Schema);
 }
 
 function generateRoutes(config) {
-  const { singular } = config.entity
+  const { singular, plural } = config.entity
   const operations = new Set(config.operations)
   const imports = ["import express from \"express\";", `import ${singular} from "../modelos/${singular}.js";`]
-  const lines = [...imports, "", "const router = express.Router();", ""]
+  const lines = [
+    `// Dónde va: backend/rutas/${slugify(plural)}.rutas.js`,
+    `// Qué es: un router de Express, el grupo de endpoints HTTP del recurso ${plural}.`,
+    "// Los métodos significan: GET consulta, POST crea, PUT edita y DELETE borra.",
+    "// El archivo backend/server.js activa estas direcciones al registrar el router",
+    "// con app.use(), y ahí es donde hay que añadir la línea del fragmento de integración.",
+    ...imports,
+    "",
+    "const router = express.Router();",
+    "",
+  ]
   const bodyOperations = operations.has("create") || operations.has("edit")
 
   if (bodyOperations) {
@@ -556,16 +656,23 @@ function generateApi(config) {
   const { singular, plural, apiPath } = config.entity
   const operations = new Set(config.operations)
   const lines = [
+    `// Dónde va: src/api/${slugify(plural)}.js`,
+    "// Qué es: la capa API del frontend. Encapsula Axios para que los componentes",
+    "// no construyan URLs ni peticiones a mano: cada función lanza la petición y",
+    "// devuelve response.data. Los componentes solo importan y llaman a estas funciones.",
     'import axios from "axios";',
     "",
-    `// Axios centraliza las peticiones del recurso ${plural}.`,
+    "// Dirección completa del recurso; usa el mismo puerto que el resto de módulos del proyecto.",
     `const API_URL = "http://localhost:3000${apiPath}";`,
     "",
   ]
   if (operations.has("list")) {
     lines.push(
+      `// GET ${apiPath}: devuelve la lista completa de ${plural}.`,
+      `// El componente llama a esta función dentro de try/catch para mostrar los errores.`,
       `export async function get${singularPluralName(singular, plural)}() {`,
       "  const response = await axios.get(API_URL);",
+      "  // response.data contiene el array JSON que envió el backend.",
       "  return response.data;",
       "}",
       ""
@@ -573,6 +680,8 @@ function generateApi(config) {
   }
   if (operations.has("create")) {
     lines.push(
+      `// POST ${apiPath}: guarda un ${singular} nuevo y devuelve el documento creado, con su identificador.`,
+      "// datos contiene los campos del formulario; el backend valida las reglas del esquema.",
       `export async function create${singular}(datos) {`,
       "  const response = await axios.post(API_URL, datos);",
       "  return response.data;",
@@ -582,6 +691,8 @@ function generateApi(config) {
   }
   if (operations.has("edit")) {
     lines.push(
+      `// PUT ${apiPath}/:id: actualiza un ${singular} y devuelve la versión guardada.`,
+      "// id es el identificador del registro (para entidades nuevas, el _id de MongoDB).",
       `export async function update${singular}(id, datos) {`,
       "  const response = await axios.put(`${API_URL}/${encodeURIComponent(id)}`, datos);",
       "  return response.data;",
@@ -591,6 +702,8 @@ function generateApi(config) {
   }
   if (operations.has("delete")) {
     lines.push(
+      `// DELETE ${apiPath}/:id: elimina un ${singular}.`,
+      "// id es el identificador del registro; el backend responde 404 si ya no existe.",
       `export async function delete${singular}(id) {`,
       "  const response = await axios.delete(`${API_URL}/${encodeURIComponent(id)}`);",
       "  return response.data;",
@@ -663,184 +776,300 @@ function generateComponent(config) {
   const { component, title, type } = config.screen
   const operations = new Set(config.operations)
   const resourceDetails = getResourceApiDetails(config)
+  const idField = resourceDetails.idField || "_id"
   const apiImports = []
-  const isFormOnly = type === "Formulario"
-  const isReadOnly = ["Listado", "Detalle"].includes(type)
+  const hasForm = (operations.has("create") || operations.has("edit")) && type !== "Detalle"
+  const hasList = operations.has("list")
+  const showActions = (operations.has("edit") || operations.has("delete")) && type !== "Detalle"
+  const editingOnly = operations.has("edit") && !operations.has("create")
   if (operations.has("list")) apiImports.push(resourceDetails.apiFunctions.list || `get${singularPluralName(singular, plural)}`)
-  if (operations.has("create")) apiImports.push(resourceDetails.apiFunctions.create || `create${singular}`)
-  if (operations.has("edit")) apiImports.push(resourceDetails.apiFunctions.edit || `update${singular}`)
+  if (hasForm && operations.has("create")) apiImports.push(resourceDetails.apiFunctions.create || `create${singular}`)
+  if (hasForm && operations.has("edit")) apiImports.push(resourceDetails.apiFunctions.edit || `update${singular}`)
   if (operations.has("delete")) apiImports.push(resourceDetails.apiFunctions.delete || `delete${singular}`)
   const fieldsInForm = config.fields.filter((field) => field.form)
   const listFields = config.fields.filter((field) => field.list)
   const searchFields = config.fields.filter((field) => field.search)
   const initialValues = Object.fromEntries(config.fields.map((field) => [field.name, defaultValue(field)]))
-  const scriptImports = ["ref", "reactive"]
+  const scriptImports = ["ref"]
+  if (hasForm) scriptImports.push("reactive")
   if (config.operations.includes("search")) scriptImports.push("computed")
-  if (operations.has("list")) scriptImports.push("onMounted")
+  if (hasList) scriptImports.push("onMounted")
+  const alertImports = ["alertaError"]
+  if (hasForm || operations.has("delete")) alertImports.push("alertaExito")
+  if (operations.has("delete")) alertImports.push("alertaConfirmacion")
+  const recordOptions = resourceDetails.catalogOnly ? "registroActual, index" : "registroActual"
+  const keyExpression = resourceDetails.catalogOnly ? "index" : `registroActual.${idField}`
+  const templatePurpose = [
+    hasForm ? "El bloque <form> crea y edita registros a través de la capa de API." : "",
+    hasList ? "La tabla muestra los registros que devuelve el backend." : "",
+  ].filter(Boolean).join(" ")
   const componentTemplate = [
     "<template>",
+    `  <!--
+    Dónde va: src/components/${component}.vue
+    Qué es: pantalla ${type} para ${title}. ${templatePurpose}
+    La lógica está en el bloque <script setup> de abajo, comentado paso a paso.
+    Los pasos para copiar e integrar este archivo están en INSTRUCCIONES.md.
+  -->`,
     '  <section class="mx-auto w-full rounded-lg bg-white p-4 shadow sm:p-8">',
     `    <h1 class="mb-6 rounded bg-[#1b4965] px-4 py-3 text-xl font-semibold text-white">${escapeHtml(title)}</h1>`,
   ]
 
-  if ((operations.has("create") || operations.has("edit")) && !isReadOnly) {
-    const formCondition = isFormOnly ? "true" : `${operations.has("edit") && !operations.has("create") ? "editingId" : "true"}`
+  if (hasForm) {
+    const showWhenEditing = editingOnly
+    const submitLabel = showWhenEditing
+      ? '{{ saving ? "Guardando..." : "Guardar cambios" }}'
+      : operations.has("edit")
+        ? '{{ saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear" }}'
+        : '{{ saving ? "Guardando..." : "Crear" }}'
     componentTemplate.push(
-      `    <form v-if="${formCondition}" class="mb-8 grid gap-4" @submit.prevent="guardar">`,
+      showWhenEditing
+        ? '    <form v-if="editingId" class="mb-8 grid gap-4" @submit.prevent="guardar">'
+        : '    <form class="mb-8 grid gap-4" @submit.prevent="guardar">',
       ...fieldsInForm.map(fieldControl),
-      '      <p v-if="error" class="rounded border border-red-300 bg-red-50 p-3 text-red-700" role="alert">{{ error }}</p>',
       '      <div class="flex flex-wrap gap-3">',
-      '        <button type="submit" class="rounded bg-[#1b4965] px-5 py-2 font-semibold text-white disabled:opacity-60" :disabled="saving">{{ saving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear" }}</button>',
-      operations.has("edit") ? '        <button v-if="editingId" type="button" class="rounded border px-5 py-2" @click="limpiar">Cancelar edición</button>' : "",
+      `        <button type="submit"${showWhenEditing ? ' v-if="editingId"' : ""} class="rounded bg-[#1b4965] px-5 py-2 font-semibold text-white disabled:opacity-60" :disabled="saving">${submitLabel}</button>`,
+      operations.has("edit") && hasList
+        ? '        <button v-if="editingId" type="button" class="rounded border px-5 py-2" @click="limpiar">Cancelar edición</button>'
+        : "",
       '      </div>',
-      "    </form>"
+      '    </form>'
     )
   }
-  if (operations.has("search")) {
+  if (config.operations.includes("search")) {
     componentTemplate.push(
+      '    <!-- La búsqueda filtra la tabla en el navegador; no vuelve a consultar la API. -->',
       '    <label class="mb-4 grid gap-2">Buscar en los campos configurados',
       '      <input v-model="searchTerm" class="rounded border border-gray-300 p-2" type="search" placeholder="Escribe para filtrar...">',
-      "    </label>"
+      '    </label>'
     )
   }
-  if (operations.has("list")) {
+  if (hasList) {
+    if (type === "Detalle") {
+      componentTemplate.push(
+        '    <!-- El detalle muestra el registro marcado con el botón «Ver»; si no se ha',
+        '         marcado ninguno, usa el primero de la lista. Si la pantalla debe recibir',
+        '         el identificador por la ruta, adapta este bloque y el <script setup>. -->',
+        '    <div v-if="!loading && (registroDetalle || registrosVisibles[0])" class="mb-4 rounded border border-gray-200 bg-gray-50 p-4">',
+        '      <h2 class="mb-2 font-semibold">Detalle del registro</h2>',
+        '      <dl class="grid gap-2">',
+        '        <template v-for="campo in Object.keys(registroDetalle || registrosVisibles[0])" :key="campo">',
+        "          <div class=\"flex gap-2\" v-if=\"campo !== '_id'\">",
+        '            <dt class="font-medium text-gray-700">{{ campo }}</dt>',
+        '            <dd>{{ (registroDetalle || registrosVisibles[0])[campo] }}</dd>',
+        '          </div>',
+        '        </template>',
+        '      </dl>',
+        '    </div>'
+      )
+    }
     componentTemplate.push(
       '    <p v-if="loading" class="py-4 text-gray-600" role="status">Cargando registros...</p>',
-      !operations.has("create") && !operations.has("edit")
-        ? '    <p v-if="error && !saving" class="mb-4 rounded border border-red-300 bg-red-50 p-3 text-red-700" role="alert">{{ error }}</p>'
-        : "",
-      type === "Detalle"
-        ? '    <div v-if="!loading && registrosVisibles[0]" class="mb-4 rounded border border-gray-200 bg-gray-50 p-4">\n      <h2 class="mb-2 font-semibold">Detalle del registro</h2>\n      <dl class="grid gap-2">\n        <template v-for="campo in Object.keys(registrosVisibles[0])" :key="campo">\n          <div class="flex gap-2" v-if="campo !== "_id"">\n            <dt class="font-medium text-gray-700">{{ campo }}</dt>\n            <dd>{{ registrosVisibles[0][campo] }}</dd>\n          </div>\n        </template>\n      </dl>\n    </div>'
-        : "",
       '    <div v-if="!loading" class="overflow-x-auto">',
       '      <table class="w-full border-collapse text-left">',
       '        <thead><tr class="border-b bg-gray-50">',
       ...listFields.map((field) => `          <th class="p-3">${escapeHtml(field.label)}</th>`),
-      operations.has("edit") || operations.has("delete") ? '          <th class="p-3">Acciones</th>' : "",
-      "        </tr></thead>",
+      (showActions || type === "Detalle") ? '          <th class="p-3">Acciones</th>' : "",
+      '        </tr></thead>',
       '        <tbody>',
-      '          <tr v-for="registroActual in registrosVisibles" :key="registroActual._id" class="border-b">',
+      `          <tr v-for="${recordOptions} in registrosVisibles" :key="${keyExpression}" class="border-b">`,
       ...listFields.map((field) => `            <td class="p-3">{{ registroActual.${field.name} }}</td>`),
-      operations.has("edit") || operations.has("delete")
-        ? `            <td class="flex gap-2 p-3">
+      type === "Detalle"
+        ? '            <td class="p-3"><button type="button" class="rounded border px-3 py-1" @click="ver(registroActual)">Ver</button></td>'
+        : showActions
+          ? `            <td class="flex gap-2 p-3">
 ${operations.has("edit") ? '              <button type="button" class="rounded border px-3 py-1" @click="editar(registroActual)">Editar</button>' : ""}
 ${operations.has("delete") ? '              <button type="button" class="rounded border border-red-300 px-3 py-1 text-red-700" @click="eliminar(registroActual)">Borrar</button>' : ""}
             </td>`
-        : "",
-      "          </tr>",
+          : "",
+      '          </tr>',
       '          <tr v-if="registrosVisibles.length === 0"><td class="p-4 text-gray-600" :colspan="columnCount">No hay registros para mostrar.</td></tr>',
-      "        </tbody>",
-      "      </table>",
-      "    </div>"
+      '        </tbody>',
+      '      </table>',
+      '    </div>'
     )
   }
-  componentTemplate.push("  </section>", "</template>")
+  componentTemplate.push('  </section>', '</template>')
 
   const script = [
     "<script setup>",
+    `// Dónde va: src/components/${component}.vue, continuando el bloque <template> de arriba.`,
+    "// Patrón del proyecto: el estado vive en ref y reactive, las peticiones salen por la",
+    `// capa de API (${resourceDetails.modulePath.replace("../", "src/")}) y los avisos usan`,
+    "// src/utils/alertas.js (SweetAlert2), la utilidad que comparten todas las pantallas.",
     `import { ${scriptImports.join(", ")} } from "vue";`,
     `import { ${apiImports.join(", ")} } from "${resourceDetails.modulePath}";`,
+    `import { ${alertImports.join(", ")} } from "../utils/alertas.js";`,
     "",
-    `const initialValues = ${js(initialValues)};`,
-    "const registro = reactive({ ...initialValues });",
-    `const registros = ref([]);`,
-    "const loading = ref(false);",
-    "const saving = ref(false);",
-    "const error = ref(\"\");",
-    "const editingId = ref(null);",
-    operations.has("search") ? "const searchTerm = ref(\"\");" : "",
-    operations.has("search")
-      ? `const registrosVisibles = computed(() => {
-  const query = searchTerm.value.trim().toLocaleLowerCase();
-  if (!query) return registros.value;
-  return registros.value.filter((item) =>
-    [${searchFields.map((field) => `item.${field.name}`).join(", ")}]
-      .some((value) => String(value ?? "").toLocaleLowerCase().includes(query))
-  );
-});`
-      : "const registrosVisibles = registros;",
-    `const columnCount = ${listFields.length + (operations.has("edit") || operations.has("delete") ? 1 : 0)};`,
   ]
-
-  if (operations.has("list")) {
+  if (hasForm) {
+    script.push(
+      "// Valores con los que arranca el formulario; limpiar() vuelve a ellos tras guardar o cancelar.",
+      `const initialValues = ${js(initialValues)};`,
+      "// reactive guarda los valores del formulario; cada control los edita con v-model=\"registro.campo\".",
+      "const registro = reactive({ ...initialValues });",
+      "// editingId distingue «crear» de «editar»: guarda el identificador de la fila que se edita.",
+      "const editingId = ref(null);",
+      "// saving desactiva el botón de guardar mientras la petición está en curso.",
+      "const saving = ref(false);",
+      "",
+    )
+  }
+  if (hasList) {
+    script.push(
+      "// registros guarda la lista completa del backend; la tabla muestra registrosVisibles (abajo).",
+      "const registros = ref([]);",
+      "// loading muestra el mensaje «Cargando registros...» mientras la petición está en curso.",
+      "const loading = ref(false);",
+      "",
+    )
+  }
+  if (type === "Detalle") {
+    script.push(
+      "// registroDetalle guarda el registro marcado con el botón «Ver» para el bloque de detalle.",
+      "const registroDetalle = ref(null);",
+      "",
+    )
+  }
+  if (config.operations.includes("search")) {
+    script.push(
+      "// searchTerm recoge el texto del buscador y lo usa el computed siguiente; no vuelve a",
+      "// llamar a la API, solo filtra los registros que ya están en pantalla.",
+      'const searchTerm = ref("");',
+    )
+  }
+  if (config.operations.includes("search")) {
+    script.push(
+      "",
+      "// computed recalcula la tabla cada vez que cambian los registros o el texto buscado.",
+      "const registrosVisibles = computed(() => {",
+      "  const query = searchTerm.value.trim().toLocaleLowerCase();",
+      "  if (!query) return registros.value;",
+      "  return registros.value.filter((item) =>",
+      `    [${searchFields.map((field) => `item.${field.name}`).join(", ")}]`,
+      '      .some((value) => String(value ?? "").toLocaleLowerCase().includes(query))',
+      "  );",
+      "});",
+    )
+  } else if (hasList) {
+    script.push("", "const registrosVisibles = registros;")
+  }
+  if (hasList) {
+    script.push(
+      "",
+      "// columnCount hace que la fila «No hay registros» ocupe el ancho de toda la tabla.",
+      `const columnCount = ${listFields.length + ((showActions || type === "Detalle") ? 1 : 0)};`,
+    )
+  }
+  script.push(
+    "",
+    "// La API puede devolver el mensaje de error en «mensaje» o «message»; si no incluye",
+    "// ninguno se muestra el texto por defecto (mismo patrón que las pantallas del proyecto).",
+    "function mensaxeDoErro(requestError, porDefecto) {",
+    "  return requestError.response?.data?.mensaje || requestError.response?.data?.message || porDefecto;",
+    "}",
+  )
+  if (hasList) {
     const listFunction = resourceDetails.apiFunctions.list || `get${singularPluralName(singular, plural)}`
     script.push(
       "",
+      "// Trae la lista completa desde la capa API; onMounted(cargar) (al final del archivo)",
+      "// la ejecuta automáticamente al abrir la pantalla.",
       "async function cargar() {",
       "  loading.value = true;",
-      "  error.value = \"\";",
       "  try {",
       `    registros.value = await ${listFunction}();`,
       "  } catch (requestError) {",
-      "    error.value = requestError.response?.data?.mensaje || requestError.message || \"No se pudieron cargar los registros.\";",
+      '    alertaError(mensaxeDoErro(requestError, "No se pudieron cargar los registros."), "Error al cargar");',
       "  } finally {",
+      "    // finally se ejecuta siempre: la pantalla deja de mostrar «Cargando...» aunque falle.",
       "    loading.value = false;",
       "  }",
-      "}"
+      "}",
     )
   }
-  if (operations.has("create") || operations.has("edit")) {
+  if (type === "Detalle") {
     script.push(
       "",
+      "function ver(item) {",
+      "  // Copia el registro elegido al bloque de detalle del <template>.",
+      "  registroDetalle.value = item;",
+      "}",
+    )
+  }
+  if (hasForm) {
+    script.push(
+      "",
+      "// Devuelve el formulario a sus valores iniciales y sale del modo edición.",
       "function limpiar() {",
       "  Object.assign(registro, initialValues);",
       "  editingId.value = null;",
-      "  error.value = \"\";",
-      "}"
+      "}",
     )
   }
   if (operations.has("edit")) {
     script.push(
       "",
+      "// Copia los datos de la fila pulsada al formulario para poder cambiarlos.",
+      idField === "_id"
+        ? "// editingId toma item._id, el identificador que MongoDB genera para cada documento."
+        : `// editingId toma item.${idField}: es el valor que la API real usa para localizar el registro.`,
       "function editar(item) {",
       "  Object.assign(registro, initialValues, item);",
-      "  editingId.value = item._id;",
-      "  error.value = \"\";",
-      "}"
+      `  editingId.value = item.${idField};`,
+      "}",
     )
   }
-  if (operations.has("create") || operations.has("edit")) {
+  if (hasForm) {
     const createFunction = resourceDetails.apiFunctions.create || `create${singular}`
     const updateFunction = resourceDetails.apiFunctions.edit || `update${singular}`
+    const guardarBranch = operations.has("edit") && operations.has("create")
+      ? `    if (editingId.value) await ${updateFunction}(editingId.value, datos);\n    else await ${createFunction}(datos);`
+      : operations.has("edit")
+        ? `    await ${updateFunction}(editingId.value, datos);`
+        : `    await ${createFunction}(datos);`
     script.push(
       "",
+      "// Envía los datos del formulario a la capa API: crea un registro nuevo o guarda",
+      "// los cambios del que se está editando. El backend valida de nuevo todas las reglas.",
       "async function guardar() {",
       "  saving.value = true;",
-      "  error.value = \"\";",
       "  try {",
       `    const datos = { ${fieldsInForm.map((field) => `${field.name}: registro.${field.name}`).join(", ")} };`,
-      operations.has("edit") && operations.has("create")
-        ? `    if (editingId.value) await ${updateFunction}(editingId.value, datos);\n    else await ${createFunction}(datos);`
-        : operations.has("edit")
-          ? `    if (editingId.value) await ${updateFunction}(editingId.value, datos);`
-          : `    await ${createFunction}(datos);`,
+      guardarBranch,
       "    limpiar();",
-      operations.has("list") ? "    await cargar();" : "",
+      hasList ? "    await cargar();" : "",
+      '    await alertaExito("Registro guardado.");',
       "  } catch (requestError) {",
-      "    error.value = requestError.response?.data?.mensaje || requestError.message || \"No se pudo guardar el registro.\";",
+      '    alertaError(mensaxeDoErro(requestError, "No se pudo guardar el registro."), "Error al guardar");',
       "  } finally {",
       "    saving.value = false;",
       "  }",
-      "}"
+      "}",
     )
   }
   if (operations.has("delete")) {
     const deleteFunction = resourceDetails.apiFunctions.delete || `delete${singular}`
     script.push(
       "",
+      "// Pide confirmación con la utilidad compartida del proyecto antes de borrar.",
+      idField === "_id"
+        ? "// Se envía item._id, el identificador del documento en MongoDB."
+        : `// Se envía item.${idField}, el identificador real del recurso (no _id).`,
       "async function eliminar(item) {",
-      `  if (!window.confirm("¿Quieres borrar este registro de ${escapeHtml(plural)}?")) return;`,
-      "  error.value = \"\";",
+      `  const confirmacion = await alertaConfirmacion("¿Quieres borrar este registro de ${plural}?");`,
+      "  if (!confirmacion.isConfirmed) return;",
       "  try {",
-      `    await ${deleteFunction}(item._id);`,
+      `    await ${deleteFunction}(item.${idField});`,
       "    await cargar();",
+      '    await alertaExito("Registro eliminado.");',
       "  } catch (requestError) {",
-      "    error.value = requestError.response?.data?.mensaje || requestError.message || \"No se pudo borrar el registro.\";",
+      '    alertaError(mensaxeDoErro(requestError, "No se pudo borrar el registro."), "Error al borrar");',
       "  }",
-      "}"
+      "}",
     )
   }
-  if (operations.has("list")) script.push("", "onMounted(cargar);")
+  if (hasList) script.push("", "onMounted(cargar);")
   script.push("</script>", "")
   return `${componentTemplate.filter(Boolean).join("\n")}\n\n${script.filter(Boolean).join("\n")}`
 }
@@ -856,12 +1085,76 @@ function generateInstructions(config) {
     search: "buscar en la lista",
   })[operation]).join(", ")
   const menuFragment = menuLabel
-    ? `\n\nPara añadir el enlace del menú, revisa el estilo de [src/components/NavBar.vue](../../../src/components/NavBar.vue) e inserta dentro de su navegación un enlace como este:\n\n\`\`\`vue\n<RouterLink to="${escapeHtml(route)}">${escapeHtml(menuLabel)}</RouterLink>\n\`\`\`\n`
+    ? `\n\nPara añadir el enlace del menú, revisa el estilo de [src/components/NavBar.vue](../../../../src/components/NavBar.vue) e inserta dentro de su navegación un enlace como este:\n\n\`\`\`vue\n<RouterLink to="${escapeHtml(route)}">${escapeHtml(menuLabel)}</RouterLink>\n\`\`\`\n`
     : "\n\nNo se solicitó un enlace de menú. Si lo necesitas, añade uno manualmente a `src/components/NavBar.vue`."
 
   if (config.source === "existing") {
-    const resourceLabel = config.existingResource ? RESOURCE_LIBRARY[config.existingResource]?.label || config.existingResource : "el recurso existente"
-    return `# Integración de ${title}\n\n## Resumen\n\nSe reutiliza el recurso existente **${resourceLabel}** para la pantalla **${title}** (${type}). No se genera backend nuevo ni se duplica la colección; la pantalla consume la API ya existente y solo queda pendiente la integración manual en el router y el menú.\n\n## Archivos generados\n\n- \`src/components/${component}.vue\`: pantalla Vue que consume la API real del proyecto y se puede copiar a la estructura del frontend.\n- \`configuracion.json\`: respuestas estructuradas y trazabilidad del origen de datos.\n- \`INSTRUCCIONES.md\`: esta guía de integración.\n\n## Qué se debe revisar manualmente\n\n1. Comprueba los nombres reales del recurso en los módulos de \`src/api/\` y los campos devueltos por la API.\n2. Asegúrate de que el componente generado usa los nombres de campo correctos del backend real.\n3. Registra la ruta en \`src/router/index.js\` y, si hace falta, añade el enlace a \`src/components/NavBar.vue\`.\n4. Si la pantalla necesita datos o filtros que no existen en la API actual, será necesario ampliarlos manualmente en el backend o en la API del cliente.\n\n## Ruta del recurso existente\n\nLa API ya disponible es \`${apiPath}\`, y la herramienta no crea modelos ni routers nuevos para evitar duplicados.\n\n## Orden recomendado\n\n1. Copia el componente generado a \`src/components/${component}.vue\`.\n2. Registra la ruta del componente en la router del proyecto.\n3. Añade el enlace del menú si procede.\n4. Prueba que la pantalla carga los datos del recurso real y que no se envían llamadas a endpoints inexistentes.\n\n## Comprobaciones manuales\n\n- Comprueba que la pantalla carga la API real sin errores de red.\n- Prueba las operaciones elegidas: ${operationsText}.\n- Asegúrate de que la lista o formulario usa los campos reales retornados por la API.\n- Ejecuta \`npm run build\` para validar que el componente compila en el proyecto, pero este comando no comprueba que la API del recurso responda correctamente ni que la base de datos esté conectada.\n\n## Límites de esta entrega\n\n- No se genera un backend nuevo para evitar duplicar recursos reales.\n- Si la API del proyecto no ofrece una operación concreta, la pantalla debe adaptarse manualmente o dejarse como propuesta no funcional.\n- Esta entrega solo funciona con recursos ya observados en el repositorio y no inventa nuevas rutas ni colecciones.\n`
+    const resourceMeta = RESOURCE_LIBRARY[config.existingResource] ?? null
+    const resourceLabel = resourceMeta?.label ?? config.existingResource
+    const operationLabels = { list: "listar", create: "crear", edit: "editar", delete: "borrar", search: "buscar en local" }
+    const supportedText = resourceMeta
+      ? Object.keys(resourceMeta.apiFunctions).map((operation) => operationLabels[operation] ?? operation).join(", ")
+      : operationsText
+    const referenceText = resourceMeta
+      ? resourceMeta.referenceFiles.map((file) => `- \`${file}\``).join("\n")
+      : "- los módulos de `src/api/` del proyecto"
+    return `# Integración de ${title}
+
+## Resumen
+
+Se reutiliza el recurso existente **${resourceLabel}** (\`${config.existingResource}\`) para la pantalla **${title}** (${type}). No se genera backend nuevo ni se duplica ninguna colección: la pantalla llama a la API real del proyecto con las funciones que ya exporta \`src/api/${resourceMeta?.apiFile ?? ""}\`.
+
+Las operaciones reales que ofrece este recurso son: ${supportedText}. Si la pantalla necesita una operación fuera de esa lista, hay que implementarla primero en el backend y en el módulo de la API.
+
+## Identificador real del recurso
+
+${resourceMeta?.catalogOnly
+  ? "Esta API es un catálogo de solo lectura: devuelve listas generadas desde un archivo JSON y no trabaja con identificadores por documento, así que la pantalla generada solo consulta y muestra."
+  : `Esta API localiza cada documento por ${config.entity.idField === "_id" ? "`_id`, el identificador automático de MongoDB" : `\`${config.entity.idField}\`, no por \`_id\``}. El componente generado usa \`item.${config.entity.idField}\` como clave de la tabla y al editar o borrar; no uses \`_id\` si el recurso no trabaja con él.`}
+
+${resourceMeta?.notes ? `**Importante:** ${resourceMeta.notes}\n\n` : ""}## Archivos que fundamentan el patrón
+
+${referenceText}
+
+Lee esos archivos para confirmar los nombres reales de los campos antes de copiar el componente; si algún campo configurado no coincide, ajústalo.
+
+## Archivos generados
+
+- \`src/components/${component}.vue\`: pantalla Vue comentada, bloque a bloque, que consume la API real del proyecto.
+- \`configuracion.json\`: respuestas del formulario guardadas para poder revisar o regenerar la propuesta.
+- \`INSTRUCCIONES.md\`: esta guía de integración.
+
+## Qué NO genera esta entrega
+
+- No se genera ningún archivo de backend: ni modelos, ni routers, ni módulos de API nuevos.
+- Si un campo configurado no coincide con el modelo real, corrige su nombre en el componente antes de copiarlo.
+- Si la pantalla necesita filtros o datos que la API actual no ofrece, amplíalos manualmente en el backend y en \`src/api/\`.
+
+## Orden recomendado
+
+1. Compara los campos configurados con el modelo real del recurso y ajusta los nombres que no coincidan.
+2. Copia el componente a \`src/components/${component}.vue\`.
+3. Registra la pantalla en el router del proyecto, antes de la ruta comodín \`/:pathMatch(.*)\`:
+
+\`\`\`js
+import ${component} from "../components/${component}.vue";
+
+{ path: "${escapeHtml(route)}", name: "${component}", component: ${component} },
+\`\`\`
+${menuFragment}
+## Comprobaciones manuales
+
+- Comprueba que la pantalla carga la API real sin errores de red.
+- Prueba las operaciones elegidas: ${operationsText}.
+- Asegúrate de que la lista y el formulario usan los campos reales que devuelve la API.
+- Ejecuta \`npm run build\` para validar que el componente compila en el proyecto; este comando no comprueba que la API responda correctamente ni que MongoDB esté conectada.
+
+## Límites de esta entrega
+
+- No se genera backend nuevo, para no duplicar recursos reales.
+- Las relaciones con otras entidades, los selectores de catálogo y los stores de Pinia no se generan todavía; deben completarse a mano.
+- Esta versión solo se apoya en recursos ya presentes en el repositorio y no inventa rutas ni colecciones.
+`
   }
 
   return `# Integración de ${title}
@@ -916,32 +1209,28 @@ ${menuFragment}
 - El identificador de MongoDB es siempre \`_id\`; no se generan identificadores de negocio.
 - La búsqueda se hace en memoria sobre los registros ya cargados, no en MongoDB.
 - No se generan relaciones, stores Pinia, catálogos externos, filtros avanzados, ordenación ni exportación PDF.
-- Los tipos Listado, Detalle, Formulario y Relacionado se soportan cuando la validación y la configuración lo permiten; si un caso requiere relaciones o catálogos más complejos, debe completarse manualmente.
-- La reutilización de recursos existentes queda soportada cuando se elige ese origen; en ese caso la herramienta no duplica backend.
+- Los tipos Listado, Detalle y Formulario se generan a partir del mismo CRUD; el tipo Relacionado (relaciones y stores de Pinia) queda fuera de esta versión y el formulario lo impide.
+- Las confirmaciones y los avisos de error o éxito usan la utilidad compartida \`src/utils/alertas.js\` (SweetAlert2), igual que el resto de pantallas del proyecto.
+- La reutilización de recursos existentes queda soportada cuando se elige ese origen; en ese caso la herramienta no duplica backend y usa el identificador real de cada recurso.
 - Las restricciones se limitan a las opciones configurables del formulario y al esquema Mongoose generado; revisa las reglas específicas de negocio antes de integrar.
 `
 }
 
 function getResourceApiDetails(config) {
-  const source = config.source === "existing" && config.existingResource ? config.existingResource : config.entity.plural
-  const resourceMeta = RESOURCE_LIBRARY[source] || null
-  if (!resourceMeta) {
+  if (config.source === "existing" && config.existingResource && RESOURCE_LIBRARY[config.existingResource]) {
+    const resourceMeta = RESOURCE_LIBRARY[config.existingResource]
     return {
-      modulePath: `../api/${slugify(config.entity.plural)}.js`,
-      apiFunctions: {},
+      modulePath: `../api/${resourceMeta.apiFile}`,
+      apiFunctions: resourceMeta.apiFunctions,
+      idField: resourceMeta.idField || "_id",
+      catalogOnly: Boolean(resourceMeta.catalogOnly),
     }
   }
-
-  const apiFunctions = {
-    list: resourceMeta.list,
-    create: resourceMeta.create,
-    edit: resourceMeta.edit,
-    delete: resourceMeta.delete,
-  }
-
   return {
-    modulePath: `../api/${resourceMeta.apiFile}`,
-    apiFunctions,
+    modulePath: `../api/${slugify(config.entity.plural)}.js`,
+    apiFunctions: {},
+    idField: config.entity.idField || "_id",
+    catalogOnly: false,
   }
 }
 

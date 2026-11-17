@@ -13,7 +13,7 @@
       <header class="page-header">
         <p class="eyebrow">Herramienta local · sin IA · sin conexión externa</p>
         <h1>Generador de componentes</h1>
-        <p class="intro">Describe una pantalla y obtén archivos explicados para integrar manualmente en este proyecto, con soporte para CRUD, listado, detalle, formulario y pantallas relacionadas.</p>
+        <p class="intro">Describe una pantalla y obtén archivos explicados para integrar manualmente en este proyecto, con soporte para CRUD, listado, detalle y formularios. Las pantallas relacionadas, los catálogos para selectores y el PDF quedan para fases posteriores.</p>
         <div id="resource-notice" class="notice notice-info" role="status">
           Comprobando los patrones que existen en este proyecto...
         </div>
@@ -40,9 +40,9 @@
               <option value="Listado">Listado</option>
               <option value="Detalle">Detalle</option>
               <option value="Formulario">Formulario</option>
-              <option value="Relacionado">Relacionado</option>
+              <option value="Relacionado" disabled>Relacionado (no disponible todavía)</option>
             </select>
-            <small id="type-help">La plantilla genera la vista adecuada según el tipo de pantalla y el origen de datos elegido.</small>
+            <small id="type-help">La plantilla genera la vista adecuada según el tipo de pantalla y el origen de datos elegido. El tipo Relacionado exige generar relaciones y stores de Pinia que aún no existen, así que permanece deshabilitado.</small>
           </label>
           <label class="field">
             <span>Origen de datos</span>

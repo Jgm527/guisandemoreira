@@ -156,8 +156,12 @@ function renderPreview(preview) {
     ["Pantalla", `${config.screen.title} → ${config.screen.component}.vue`],
     ["Ruta de navegador", config.screen.route],
     ["Origen", config.source === "existing" ? `Recurso existente: ${config.existingResource || "sin elegir"}` : "Entidad nueva"],
-    ["Colección", `${config.entity.plural || config.existingResource || "recurso"} (identificador _id)`],
-    ["Ruta REST", config.entity.apiPath || "Se reutiliza la API existente"],
+    ["Colección", config.source === "existing"
+      ? `recurso ${config.existingResource || "elegir"} ya existente (no se duplica)`
+      : `${config.entity.plural || "recurso"} (identificador _id de MongoDB)`],
+    ["Ruta REST", config.source === "existing"
+      ? `${config.entity.apiPath} (API ya existente, no se toca)`
+      : (config.entity.apiPath || "Se reutiliza la API existente")],
     ["Carpeta que se escribirá", preview.outputPath],
   ]
   for (const [label, value] of summaryItems) {
@@ -179,7 +183,7 @@ function renderPreview(preview) {
   if (preview.collisions.length) {
     showNotice(
       previewMessage,
-      "Se detectaron archivos existentes en el proyecto. La reutilización aún no está disponible; cambia los nombres para evitar generar un duplicado.",
+      "Se detectaron coincidencias con archivos o rutas que ya existen en el proyecto; para evitar duplicados, cambia el nombre técnico del componente o la ruta de la pantalla. Si lo que quieres es reutilizar un archivo existente, hazlo manualmente.",
       "error",
       preview.collisions
     )
@@ -415,7 +419,7 @@ async function loadProjectStatus() {
     }
     notice.append(lead, list)
     const limitation = document.createElement("p")
-    limitation.textContent = "La reutilización de recursos existentes se añadirá en una fase posterior. Si algún archivo generado coincide con uno existente, la herramienta cancelará la generación."
+    limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica; las pantallas Relacionadas, los catálogos y el PDF siguen pendientes."
     notice.append(limitation)
     if (status.outputs.length) {
       const outputs = document.createElement("p")

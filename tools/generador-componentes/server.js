@@ -14,23 +14,33 @@ const MAX_BODY_BYTES = 1_000_000
 
 const RESOURCE_REFERENCES = [
   {
+    key: "pacientes",
     name: "Pacientes",
+    apiFile: "pacientes.js",
     files: ["src/api/pacientes.js", "backend/modelos/Paciente.js", "backend/rutas/pacientes.rutas.js"],
   },
   {
+    key: "doctores",
     name: "Doctores",
+    apiFile: "doctores.js",
     files: ["src/api/doctores.js", "backend/modelos/Doctor.js", "backend/rutas/doctores.rutas.js"],
   },
   {
+    key: "citas",
     name: "Citas",
+    apiFile: "citas.js",
     files: ["src/api/citas.js", "backend/modelos/Cita.js", "backend/rutas/citas.rutas.js"],
   },
   {
+    key: "especialidades",
     name: "Especialidades",
+    apiFile: "especialidades.js",
     files: ["src/api/especialidades.js", "backend/data/especialidades.json"],
   },
   {
+    key: "municipios",
     name: "Municipios",
+    apiFile: "municipios.js",
     files: ["src/api/municipios.js", "backend/data/municipios.json"],
   },
 ]
@@ -126,24 +136,55 @@ async function findProjectCollisions(files, config) {
     if (error.code !== "ENOENT") throw error
   }
 
-  const backendPath = path.join(PROJECT_ROOT, "backend", "server.js")
-  try {
-    const backendSource = await readFile(backendPath, "utf8")
-    const endpointPattern = /\bapp\.(?:use|get|post|put|delete)\s*\(\s*(["'`])([^"'`]+)\1/g
-    for (const match of backendSource.matchAll(endpointPattern)) {
-      const currentPath = match[2].replace(/\/+$/, "")
-      const proposedPath = config.entity.apiPath.replace(/\/+$/, "")
-      if (currentPath === proposedPath ||
-          currentPath.startsWith(`${proposedPath}/`) ||
-          proposedPath.startsWith(`${currentPath}/`)) {
-        matches.push(`backend/server.js (la ruta ${proposedPath} se solapa con ${currentPath})`)
-        break
+  // El solape con backend/server.js solo interfiere cuando la pantalla crea una
+  // API nueva; reutilizar un recurso existente usa una ruta ya registrada.
+  if (config.source !== "existing") {
+    const backendPath = path.join(PROJECT_ROOT, "backend", "server.js")
+    try {
+      const backendSource = await readFile(backendPath, "utf8")
+      const endpointPattern = /\bapp\.(?:use|get|post|put|delete)\s*\(\s*(["'`])([^"'`]+)\1/g
+      for (const match of backendSource.matchAll(endpointPattern)) {
+        const currentPath = match[2].replace(/\/+$/, "")
+        const proposedPath = config.entity.apiPath.replace(/\/+$/, "")
+        if (currentPath === proposedPath ||
+            currentPath.startsWith(`${proposedPath}/`) ||
+            proposedPath.startsWith(`${currentPath}/`)) {
+          matches.push(`backend/server.js (la ruta ${proposedPath} se solapa con ${currentPath})`)
+          break
+        }
       }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
     }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error
   }
   return matches
+}
+
+// Para pantallas que reutilizan un recurso real, comprueba que sus archivos
+// existen de verdad; si falta alguno, las funciones importadas no están
+// garantizadas y la generación se detiene en lugar de fingir que funcionará.
+async function ensureExistingResourceFiles(config) {
+  if (config.source !== "existing") return
+  const reference = RESOURCE_REFERENCES.find((item) => item.key === config.existingResource)
+  if (!reference) {
+    const error = new Error("El recurso solicitado no figura entre los recursos conocidos del proyecto.")
+    error.statusCode = 400
+    throw error
+  }
+  const missing = []
+  for (const relativePath of reference.files) {
+    try {
+      await access(path.resolve(PROJECT_ROOT, relativePath))
+    } catch (error) {
+      if (error.code === "ENOENT") missing.push(relativePath)
+      else throw error
+    }
+  }
+  if (missing.length) {
+    const error = new Error(`El recurso ${reference.name} no está completo en el proyecto; faltan: ${missing.join(", ")}. No se puede garantizar que las funciones importadas existan, así que no se generó nada.`)
+    error.statusCode = 400
+    throw error
+  }
 }
 
 async function projectStatus() {
@@ -180,6 +221,7 @@ async function handlePreview(request, response) {
   }
 
   const generated = generateFiles(input)
+  await ensureExistingResourceFiles(generated.config)
   const target = getOutputPath(generated.outputSlug)
   const exists = await inspectOutput(target)
   const collisions = await findProjectCollisions(generated.files, generated.config)
@@ -200,6 +242,7 @@ async function handleGenerate(request, response) {
   }
 
   const generated = generateFiles(input)
+  await ensureExistingResourceFiles(generated.config)
   const target = getOutputPath(generated.outputSlug)
   await ensureOutputRoot()
   const exists = await inspectOutput(target)
@@ -213,7 +256,7 @@ async function handleGenerate(request, response) {
   const collisions = await findProjectCollisions(generated.files, generated.config)
   if (collisions.length) {
     return send(response, 409, {
-      message: "Algunos archivos coinciden con archivos existentes del proyecto. La reutilización de recursos aún no está disponible; se canceló para evitar confusiones.",
+      message: "Algunos archivos o rutas coinciden con lo que ya existe en el proyecto y la generación se canceló para evitar duplicados. Cambia el nombre técnico del componente o la ruta de la pantalla, o revisa los archivos indicados si quieres reutilizarlos manualmente.",
       collisions,
     })
   }

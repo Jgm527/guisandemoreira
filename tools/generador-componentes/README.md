@@ -17,23 +17,33 @@ y pulsa `Ctrl+C`.
 
 ## Primera entrega
 
-La herramienta genera una pantalla CRUD para una entidad y colección nuevas:
+La herramienta genera pantallas para una entidad y colección nuevas, con modelo
+Mongoose, router Express, módulo de API Axios y componente Vue, todos comentados
+bloque a bloque y con un encabezado que indica dónde va cada archivo.
 
-- modelo Mongoose y router Express;
-- módulo de acceso Axios y componente Vue;
-- configuración JSON reutilizable e instrucciones de integración;
-- vista previa, copia de los archivos y guardado en `salidas/`.
+También genera pantallas que reutilizan un recurso existente del proyecto
+(pacientes, doctores, citas, especialidades y municipios). En ese caso solo se
+genera el componente: llama a las funciones reales de `src/api/`, usa el
+identificador real de cada recurso (por ejemplo `dnipac` en pacientes) y la guía
+indica qué archivos de referencia revisar. Si el recurso ya existe en el
+proyecto, la generación no duplica modelos ni routers, y si algún archivo del
+recurso falta, se detiene y lo explica.
+
+Las confirmaciones, los errores y los mensajes de éxito del componente usan
+`src/utils/alertas.js` (SweetAlert2), la utilidad compartida del proyecto, en
+lugar de `window.confirm` o banners propios.
+
+El tipo de pantalla Relacionado (relaciones, selectores de catálogo y stores de
+Pinia) todavía no está disponible y el formulario lo mantiene deshabilitado.
 
 Las operaciones y campos se configuran en el formulario. La generación se
 detiene si hay errores de validación o coincidencias con los archivos del
-proyecto. Si la carpeta de salida ya existe, se solicita confirmación explícita
+proyecto, y solo se permiten las operaciones que el módulo real de cada recurso
+exporta. Si la carpeta de salida ya existe, se solicita confirmación explícita
 y se reemplaza solo esa carpeta.
 
 No se modifican archivos del proyecto ni se ejecuta código generado. Las salidas
 se guardan en `tools/generador-componentes/salidas/`, que está excluida de Git.
-El panel informa de los recursos reales que se han encontrado; la reutilización
-de recursos existentes, los otros tipos de pantalla, relaciones, catálogos,
-Pinia, filtros avanzados y PDF quedan para fases posteriores.
 
 Para repetir una propuesta, usa **Cargar configuración guardada** y selecciona
 su `configuracion.json`.
