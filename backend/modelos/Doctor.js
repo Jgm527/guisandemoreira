@@ -11,7 +11,7 @@ const DoctorSchema = new mongoose.Schema(
     // El correo es opcional, por eso no se obliga al usuario a introducirlo.
     maildoc: { type: String, required: false },
     // El nombre debe coincidir con una de las especialidades disponibles.
-    especdoc: { type: String, required: true },
+    espedoc: { type: String, required: true },
   },
   {
     collection: "doctores",

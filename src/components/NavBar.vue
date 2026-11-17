@@ -7,7 +7,7 @@
     <button
       class="hidden border-0 bg-transparent text-2xl leading-[normal] text-white max-[768px]:block"
       type="button"
-      aria-label="Abrir menú"
+      aria-label="Abrir"
       :aria-expanded="isOpen"
       @click="isOpen = !isOpen"
     >

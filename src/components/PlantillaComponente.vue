@@ -207,7 +207,7 @@
           type="submit"
           :disabled="guardando"
         >
-          {{ guardando ? "[GUARDANDO...]" : editando ? "[GUARDAR CAMBIOS]" : "[CREAR REGISTRO]" }}
+          [GUARDAR]
         </button>
         <button
           v-if="editando"
@@ -215,7 +215,7 @@
           type="button"
           @click="limpiarFormulario"
         >
-          [CANCELAR EDICION]
+          [CANCELAR]
         </button>
         <button
           v-else
@@ -223,7 +223,7 @@
           type="reset"
           @click="limpiarFormulario"
         >
-          [LIMPIAR FORMULARIO]
+          [LIMPIAR]
         </button>
       </div>
     </form>
@@ -311,7 +311,7 @@
                 <button
                   class="rounded border border-[var(--color-borde)] px-3 py-1 hover:bg-gray-100"
                   type="button"
-                  :aria-label="`[Editar] ${item.nombre}`"
+                  aria-label="[EDITAR]"
                   @click="editarRegistro(item)"
                 >
                   [EDITAR]
@@ -319,7 +319,7 @@
                 <button
                   class="rounded border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50"
                   type="button"
-                  :aria-label="`[Eliminar] ${item.nombre}`"
+                  aria-label="[ELIMINAR]"
                   @click="eliminarRegistro(item.id)"
                 >
                   [ELIMINAR]
@@ -430,7 +430,8 @@ function guardarRegistro() {
       registros.value.push(datos)
     }
 
-    limpiarFormulario()
+    Object.assign(registro, datos)
+    editando.value = true
   } catch (err) {
     // En el ejemplo local esto cubre errores sin ocultarlos; al usar API muestra su mensaje HTTP.
     error.value = err.response?.data?.mensaje || "[No se pudo guardar el registro.]"

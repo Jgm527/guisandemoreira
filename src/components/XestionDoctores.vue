@@ -44,20 +44,26 @@
 
       <!-- Eventos de entrada llaman a sanitizarMobil/sanitizarMail y las reglas usan valores computed. -->
       <div class="fila">
-        <fieldset class="campo campo-colexiado">
-          <!-- El usuario debe elegir una de las dos opciones de colegiacion. -->
-          <legend>Colexiado:</legend>
-          <span>
-          <label>
-            <input v-model="novoDoctor.coledoc" type="radio" value="SI" required />
-            Si
-          </label>
-          <label>
-            <input v-model="novoDoctor.coledoc" type="radio" value="NO" required />
-            Non
-          </label>
-          </span>
-        </fieldset>
+        <div class="campo campo-especialidade">
+          <label for="espedoc">Especialidade:</label>
+          <select
+            id="espedoc"
+            v-model="novoDoctor.espedoc"
+            required
+            :disabled="especialidades.length === 0"
+          >
+            <option value="">
+              -- Escolle unha especialidade --
+            </option>
+            <option
+              v-for="especialidade in especialidades"
+              :key="especialidade.id"
+              :value="especialidade.nm"
+            >
+              {{ especialidade.nm }}
+            </option>
+          </select>
+        </div>
 
         <div class="campo campo-mobil">
           <label for="movildoc">Móbil:</label>
@@ -96,26 +102,21 @@
         </div>
       </div>
 
-      <!-- especialidades se carga en onMounted y se convierte en opciones del selector. -->
-      <div class="fila">
-        <div class="campo campo-especialidade">
-          <label for="especdoc">Especialidade:</label>
-          <select
-            id="especdoc"
-            v-model="novoDoctor.especdoc"
-            required
-            :disabled="especialidades.length === 0"
-          >
-            <option value="">-- Escolle unha especialidade --</option>
-            <option
-              v-for="especialidade in especialidades"
-              :key="especialidade.id"
-              :value="especialidade.nm"
-            >
-              {{ especialidade.nm }}
-            </option>
-          </select>
-        </div>
+      <div class="fila fila-colexiado">
+        <fieldset class="campo campo-colexiado">
+          <!-- El usuario debe elegir una de las dos opciones de colegiacion. -->
+          <legend>Colexiado:</legend>
+          <span>
+            <label>
+              <input v-model="novoDoctor.coledoc" type="radio" value="SI" required>
+              Si
+            </label>
+            <label>
+              <input v-model="novoDoctor.coledoc" type="radio" value="NO" required>
+              Non
+            </label>
+          </span>
+        </fieldset>
       </div>
 
       <p v-if="erro" class="mensaxe-erro" role="alert">{{ erro }}</p>
@@ -123,13 +124,13 @@
       <!-- Un solo formulario sirve para altas y ediciones; los botones varian segun editando. -->
       <div class="form-acciones">
         <button type="submit" class="btn-guardar">
-          {{ editando ? "Gardar cambios" : "Gardar doctor" }}
+          Guardar
         </button>
         <button v-if="editando" type="button" class="btn-secundario" @click="limparFormulario">
-          Cancelar edición
+          Cancelar
         </button>
         <button v-else type="reset" class="btn-secundario" @click="limparFormulario">
-          Limpar formulario
+          Limpiar
         </button>
       </div>
     </form>
@@ -140,8 +141,8 @@
       <button
         class="btn-informe"
         type="button"
-        title="Exportar listado de doctores a PDF"
-        aria-label="Exportar listado de doctores a PDF"
+        title="Exportar"
+        aria-label="Exportar"
         :disabled="doctores.length === 0"
         @click="exportarDoctores"
       >
@@ -176,13 +177,13 @@
             <td class="centrado">{{ doctor.coledoc }}</td>
             <td>{{ doctor.movildoc }}</td>
             <td>{{ doctor.maildoc || "—" }}</td>
-            <td>{{ doctor.especdoc }}</td>
+            <td>{{ doctor.espedoc }}</td>
             <td class="centrado">
               <button
                 class="btn-accion"
                 type="button"
-                :title="doctorStore.idDoctor === doctor._id ? 'Doctor seleccionado' : 'Seleccionar para citas'"
-                :aria-label="doctorStore.idDoctor === doctor._id ? 'Doctor seleccionado' : 'Seleccionar para citas'"
+                title="Seleccionar"
+                aria-label="Seleccionar"
                 :aria-pressed="doctorStore.idDoctor === doctor._id"
                 @click="seleccionarDoctor(doctor)"
               >
@@ -191,10 +192,10 @@
             </td>
             <!-- Los eventos reciben el doctor actual para editarlo o eliminarlo. -->
             <td class="celda-acciones">
-              <button class="btn-accion" type="button" title="Editar doctor" @click="editarDoctor(doctor)">
+              <button class="btn-accion" type="button" title="Editar" @click="editarDoctor(doctor)">
                 ✏️
               </button>
-              <button class="btn-accion" type="button" title="Eliminar doctor" @click="eliminarDoctor(doctor)">
+              <button class="btn-accion" type="button" title="Eliminar" @click="eliminarDoctor(doctor)">
                 🗑️
               </button>
             </td>
@@ -236,7 +237,7 @@ const doctorVacio = () => ({
   coledoc: "",
   movildoc: "",
   maildoc: "",
-  especdoc: "",
+  espedoc: "",
 });
 
 // Listas reactivas usadas por la tabla y los selectores de la pantalla.
@@ -281,7 +282,7 @@ async function exportarDoctores() {
         doctor.apeldoc ?? "",
         doctor.nomedoc ?? "",
         doctor.movildoc ?? "",
-        doctor.especdoc ?? "",
+        doctor.espedoc ?? "",
       ]),
       nombreArchivo: "listado_doctores.pdf",
       orientacion: "landscape",
@@ -343,19 +344,22 @@ async function guardarDoctor() {
 
   try {
     // Copia el formulario para enviar un objeto independiente al modulo de API.
+    const estabaEditando = editando.value;
     const datosDoctor = { ...novoDoctor };
-    if (editando.value) {
+    if (estabaEditando) {
       const doctorModificado = await modifyDoctor(novoDoctor._id, datosDoctor);
+      Object.assign(novoDoctor, doctorModificado);
       if (String(doctorStore.idDoctor) === String(doctorModificado._id)) {
         seleccionarDoctor(doctorModificado);
       }
     } else {
-      await saveDoctor(datosDoctor);
+      const doctorGuardado = await saveDoctor(datosDoctor);
+      novoDoctor._id = doctorGuardado._id;
     }
+    editando.value = true;
     await alertaExito(
-      editando.value ? "O doctor actualizouse correctamente." : "O doctor gardouse correctamente."
+      estabaEditando ? "O doctor actualizouse correctamente." : "O doctor gardouse correctamente."
     );
-    limparFormulario();
     doctores.value = await cargarDoctores();
   } catch (error) {
     erro.value = mensaxeDoErro(error, "Non foi posible gardar o doctor.");
@@ -373,7 +377,7 @@ function editarDoctor(doctor) {
     coledoc: doctor.coledoc ?? "",
     movildoc: doctor.movildoc ?? "",
     maildoc: doctor.maildoc ?? "",
-    especdoc: doctor.especdoc ?? "",
+    espedoc: doctor.espedoc ?? "",
   });
   erro.value = "";
   editando.value = true;

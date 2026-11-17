@@ -6,20 +6,20 @@ export const useDoctorStore = defineStore("doctor", {
     idDoctor: null,
     nomedoc: null,
     apeldoc: null,
-    especdoc: null,
+    espedoc: null,
   }),
   actions: {
     seleccionarDoctor(doctor) {
       this.idDoctor = doctor._id ?? null;
       this.nomedoc = doctor.nomedoc;
       this.apeldoc = doctor.apeldoc;
-      this.especdoc = doctor.especdoc;
+      this.espedoc = doctor.espedoc;
     },
     limpiarDoctor() {
       this.idDoctor = null;
       this.nomedoc = null;
       this.apeldoc = null;
-      this.especdoc = null;
+      this.espedoc = null;
     },
   },
 });

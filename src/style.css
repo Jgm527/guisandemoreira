@@ -70,6 +70,14 @@
     @apply font-medium;
   }
 
+  .xestion-pacientes .consentimiento-privacidad {
+    @apply flex justify-center text-center;
+  }
+
+  .xestion-pacientes .consentimiento-privacidad label {
+    @apply inline-flex flex-wrap items-center justify-center gap-1;
+  }
+
   .xestion-pacientes .dni-control {
     @apply flex min-w-0 gap-[0.35rem];
   }
@@ -115,7 +123,7 @@
   }
 
   .xestion-pacientes .btn-guardar {
-    @apply mx-auto block cursor-pointer rounded border-0 bg-[#1b4965] px-6 py-[0.6rem] font-semibold text-white transition-colors duration-200;
+    @apply mx-auto block cursor-pointer rounded border-0 bg-[#1b4965] px-4 py-2 font-semibold text-white transition-colors duration-200;
   }
 
   .xestion-pacientes .btn-guardar:hover {
@@ -155,7 +163,7 @@
   }
 
   .xestion-pacientes .btn-accion {
-    @apply cursor-pointer rounded border-2 border-[var(--color-borde)] bg-transparent px-[0.4rem] py-[0.2rem] text-base transition-colors duration-200;
+    @apply mx-1 cursor-pointer rounded border-2 border-[var(--color-borde)] bg-transparent px-3 py-2 text-base transition-colors duration-200;
   }
 
   .xestion-pacientes .btn-accion:hover,
@@ -255,11 +263,19 @@
   }
 
   .xestion-doctores .campo-colexiado {
-    @apply m-0 border-0 p-0;
+    @apply m-0 border-0 p-0 text-center;
+  }
+
+  .xestion-doctores .fila-colexiado {
+    @apply flex justify-center;
+  }
+
+  .xestion-doctores .campo-colexiado span {
+    @apply flex justify-center gap-4;
   }
 
   .xestion-doctores .campo-colexiado label {
-    @apply mr-4 inline-flex min-h-[2.75rem] items-center gap-[0.35rem];
+    @apply inline-flex min-h-[2.75rem] items-center gap-[0.35rem];
   }
 
   .xestion-doctores .form-acciones {
@@ -268,7 +284,7 @@
 
   .xestion-doctores .btn-guardar,
   .xestion-doctores .btn-secundario {
-    @apply min-h-[2.6rem] cursor-pointer rounded border-0 px-5 py-[0.6rem] font-semibold;
+    @apply min-h-[2.6rem] cursor-pointer rounded border-0 px-4 py-2 font-semibold;
   }
 
   .xestion-doctores .btn-guardar {
@@ -292,7 +308,7 @@
   }
 
   .xestion-doctores .btn-accion {
-    @apply mx-[0.15rem] cursor-pointer rounded border border-[var(--color-borde)] bg-transparent px-[0.4rem] py-[0.2rem];
+    @apply mx-1 cursor-pointer rounded border border-[var(--color-borde)] bg-transparent px-3 py-2;
   }
 
   .xestion-doctores .lista-vacia {
@@ -363,11 +379,7 @@
   .xestion-citas .citas-boton-secundario,
   .xestion-citas .citas-boton-actualizar,
   .xestion-citas .citas-boton-accion {
-    @apply inline-flex cursor-pointer items-center justify-center rounded border border-[var(--color-borde)] font-semibold transition-colors;
-  }
-
-  .xestion-citas .citas-boton-secundario {
-    @apply px-4 py-[0.55rem];
+    @apply inline-flex cursor-pointer items-center justify-center rounded border border-[var(--color-borde)] px-4 py-2 font-semibold transition-colors;
   }
 
   .xestion-citas .citas-boton-principal {
@@ -460,7 +472,7 @@
   }
 
   .xestion-citas .citas-boton-accion {
-    @apply mx-[0.15rem] px-[0.4rem] py-[0.2rem];
+    @apply mx-1 px-3 py-2;
   }
 
   .xestion-citas .citas-erro {

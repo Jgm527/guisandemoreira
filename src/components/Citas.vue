@@ -38,26 +38,6 @@
           </div>
 
           <div class="citas-campo">
-            <label for="fecha-cita">Fecha:</label>
-            <input
-              id="fecha-cita"
-              v-model="cita.fecha"
-              type="date"
-              required
-            >
-          </div>
-
-          <div class="citas-campo">
-            <label for="hora-cita">Hora:</label>
-            <input
-              id="hora-cita"
-              v-model="cita.hora"
-              type="time"
-              required
-            >
-          </div>
-
-          <div class="citas-campo">
             <label for="paciente-cita">Paciente:</label>
             <select
               id="paciente-cita"
@@ -97,9 +77,29 @@
                 v-else
                 :value="doctorStore.idDoctor"
               >
-                {{ doctorStore.nomedoc }} {{ doctorStore.apeldoc }} — {{ doctorStore.especdoc }}
+                {{ doctorStore.nomedoc }} {{ doctorStore.apeldoc }} — {{ doctorStore.espedoc }}
               </option>
             </select>
+          </div>
+
+          <div class="citas-campo">
+            <label for="fecha-cita">Fecha:</label>
+            <input
+              id="fecha-cita"
+              v-model="cita.fecha"
+              type="date"
+              required
+            >
+          </div>
+
+          <div class="citas-campo">
+            <label for="hora-cita">Hora:</label>
+            <input
+              id="hora-cita"
+              v-model="cita.hora"
+              type="time"
+              required
+            >
           </div>
 
           <div class="citas-campo">
@@ -163,7 +163,7 @@
             type="submit"
             :disabled="guardando || !formularioValido"
           >
-            {{ guardando ? "Guardando..." : editando ? "Guardar cambios" : "Guardar cita" }}
+            Guardar
           </button>
           <button
             v-if="editando"
@@ -171,7 +171,7 @@
             type="button"
             @click="limpiarFormulario"
           >
-            Cancelar edición
+            Cancelar
           </button>
           <button
             v-else
@@ -189,8 +189,8 @@
         <button
           class="citas-boton-informe"
           type="button"
-          title="Exportar listado de citas a PDF"
-          aria-label="Exportar listado de citas a PDF"
+          title="Exportar"
+          aria-label="Exportar"
           :disabled="cargando || citas.length === 0"
           @click="exportarCitas"
         >
@@ -203,8 +203,8 @@
         <button
           class="citas-boton-informe citas-boton-actualizar"
           type="button"
-          title="Actualizar listado"
-          aria-label="Actualizar listado"
+          title="Actualizar"
+          aria-label="Actualizar"
           :disabled="cargando"
           :class="{ 'animate-spin': cargando }"
           @click="cargarDatos"
@@ -266,8 +266,8 @@
                 <button
                   class="citas-boton-accion"
                   type="button"
-                  title="Editar cita"
-                  :aria-label="`Editar cita del ${item.fecha}`"
+                  title="Editar"
+                  aria-label="Editar"
                   @click="editarCita(item)"
                 >
                   ✏️
@@ -275,8 +275,8 @@
                 <button
                   class="citas-boton-accion"
                   type="button"
-                  title="Eliminar cita"
-                  :aria-label="`Eliminar cita del ${item.fecha}`"
+                  title="Eliminar"
+                  aria-label="Eliminar"
                   @click="eliminarCita(item)"
                 >
                   🗑️
@@ -480,16 +480,19 @@ async function guardarCita() {
   }
 
   try {
-    if (editando.value) {
-      await updateCita(cita._id, datosCita)
+    const estabaEditando = editando.value
+    if (estabaEditando) {
+      const citaActualizada = await updateCita(cita._id, datosCita)
+      Object.assign(cita, citaActualizada)
     } else {
-      await saveCita(datosCita)
+      const citaGuardada = await saveCita(datosCita)
+      Object.assign(cita, citaGuardada)
     }
 
+    editando.value = true
     await alertaExito(
-      editando.value ? "La cita se ha actualizado correctamente." : "La cita se ha guardado correctamente."
+      estabaEditando ? "La cita se ha actualizado correctamente." : "La cita se ha guardado correctamente."
     )
-    limpiarFormulario()
     await cargarDatos()
   } catch (error) {
     alertaError(mensajeError(error, "No se pudo guardar la cita."))

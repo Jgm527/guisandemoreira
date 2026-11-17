@@ -41,16 +41,16 @@
             <div class="dni-acciones">
               <button
                 type="button"
-                title="Buscar paciente"
-                aria-label="Buscar paciente"
+                title="Buscar"
+                aria-label="Buscar"
                 @click="buscarPaciente"
               >
                 🔎
               </button>
               <button
                 type="button"
-                title="Limpiar formulario"
-                aria-label="Limpiar formulario"
+                title="Limpiar"
+                aria-label="Limpiar"
                 @click="limpiaFormpac"
               >
                 🧹
@@ -157,9 +157,13 @@
         </div>
       </div>
 
-      <div>
+      <div class="consentimiento-privacidad">
         <label>
-          <input v-model="novoPaciente.lopdpac" type="checkbox" /> Aceptar la
+          <input
+            v-model="novoPaciente.lopdpac"
+            type="checkbox"
+          >
+          Aceptar la
           <a
             :href="$router.resolve({ name: 'PoliticaPrivacidad' }).href"
             target="_blank"
@@ -180,7 +184,7 @@
             novoPaciente.movilpac === '' ||
             !novoPaciente.lopdpac"
         >
-          Gardar
+          Guardar
         </button>
         
       </div>
@@ -191,8 +195,8 @@
       <button
         class="btn-informe"
         type="button"
-        title="Exportar listado de pacientes a PDF"
-        aria-label="Exportar listado de pacientes a PDF"
+        title="Exportar"
+        aria-label="Exportar"
         :disabled="pacientes.length === 0"
         @click="exportarPacientes"
       >
@@ -242,8 +246,8 @@
             <td class="centrado">
               <button
                 class="btn-accion"
-                :title="pacienteStore.idPaciente === u._id ? 'Paciente seleccionado' : 'Seleccionar para citas'"
-                :aria-label="pacienteStore.idPaciente === u._id ? 'Paciente seleccionado' : 'Seleccionar para citas'"
+                title="Seleccionar"
+                aria-label="Seleccionar"
                 :aria-pressed="pacienteStore.idPaciente === u._id"
                 @click="seleccionarPaciente(u)"
               >
@@ -459,7 +463,7 @@ async function guardarPaciente() {
       mensajeExito = "El paciente se ha guardado correctamente.";
     }
 
-    editando.value = false;
+    editando.value = true;
 
   } catch (error) {
     console.error("Error ao gardar paciente:", error);

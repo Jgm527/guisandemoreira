@@ -24,9 +24,6 @@ router.post("/", async (req, res) => {
             movildoc: String(req.body.movildoc ?? "").replace(/\s+/g, "")
         };
 
-        // El identificador se genera en MongoDB y no debe aceptarse desde el cliente.
-        delete datosDoctor.iddoc;
-
         if (!/^[67]\d{8}$/.test(datosDoctor.movildoc)) {
             return res.status(400).json({
                 mensaje: "El móvil debe empezar por 6 o 7 y tener 9 dígitos"
@@ -35,7 +32,6 @@ router.post("/", async (req, res) => {
 
         // Instancia del modelo: Mongoose comprueba los campos obligatorios al guardar.
         const doctor = new Doctor(datosDoctor)
-        doctor.iddoc = doctor._id.toString();
 
         // Documento persistido que se devuelve al cliente con estado HTTP 201.
         const nuevoDoctor = await doctor.save()
@@ -57,11 +53,11 @@ router.post("/", async (req, res) => {
     }
 })
 
-// DELETE /api/doctores/:id: busca por el identificador publico iddoc.
+// DELETE /api/doctores/:id: busca por el identificador MongoDB del doctor.
 router.delete("/:id", async (req, res) => {
     try {
-        // Resultado de la busqueda y eliminacion por el identificador publico iddoc.
-        const doctor = await Doctor.findOneAndDelete({ iddoc: req.params.id });
+        // Resultado de la busqueda y eliminacion por el _id del documento.
+        const doctor = await Doctor.findByIdAndDelete(req.params.id);
         if (!doctor) {
             return res.status(404).json({ mensaje: "Doctor no encontrado" });
         }
@@ -71,7 +67,7 @@ router.delete("/:id", async (req, res) => {
     }
 });
 
-// PUT /api/doctores/:id: valida y reemplaza los campos enviados del doctor.
+// PUT /api/doctores/:id: actualiza los campos enviados del doctor.
 router.put("/:id", async (req, res) => {
     try {
         // Se trabaja sobre una copia para normalizar el movil sin alterar la peticion.
@@ -85,9 +81,9 @@ router.put("/:id", async (req, res) => {
             }
         }
 
-        // Documento actualizado; runValidators aplica las reglas del esquema a los cambios.
-        const doctor = await Doctor.findOneAndUpdate(
-            { iddoc: req.params.id },
+        // Documento actualizado por _id; runValidators aplica las reglas del esquema.
+        const doctor = await Doctor.findByIdAndUpdate(
+            req.params.id,
             datosDoctor,
             { new: true, runValidators: true }
         );
@@ -113,7 +109,7 @@ router.put("/:id", async (req, res) => {
 router.get("/:especialidad", async (req, res) => {
     try {
         // Lista de doctores cuya especialidad coincide con el segmento de la URL.
-        const doctores = await Doctor.find({ especdoc: req.params.especialidad });
+        const doctores = await Doctor.find({ espedoc: req.params.especialidad });
         res.json(doctores);
     } catch (error) {
         res.status(500).json({ mensaje: "Error al obtener los doctores", error });
