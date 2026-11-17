@@ -408,3 +408,25 @@ test("rechaza configuraciones de relación incoherentes", () => {
   result = validateConfiguration(config)
   assert.ok(result.errors.some((error) => error.includes("solo están disponibles para entidades nuevas")))
 })
+
+test("genera siempre la lista completa sin variables de búsqueda retiradas", () => {
+  const config = validConfiguration()
+  config.entity.singular = "Medicamento"
+  config.entity.plural = "medicamentos"
+  config.entity.apiPath = "/api/medicamentos"
+  config.screen.component = "Medicamentos"
+  config.screen.route = "/medicamentos"
+  config.screen.title = "Medicamentos"
+  config.operations = ["list", "create", "edit", "delete"]
+  config.fields = [
+    { name: "nombre", label: "Nombre", type: "text", required: true, defaultValue: "", form: true, list: true, search: false },
+    { name: "principioAct", label: "Principio activo", type: "text", required: true, defaultValue: "", form: true, list: false, search: false },
+  ]
+
+  const generated = generateFiles(config)
+  const component = generated.files["src/components/Medicamentos.vue"]
+  assert.match(component, /const registrosVisibles = registros;/)
+  assert.doesNotMatch(component, /searchTerm|config\.operations\.includes\("search"\)/)
+  assert.match(generated.files["src/api/medicamentos.js"], /\/api\/medicamentos/)
+  assert.match(generated.files["backend/rutas/medicamentos.rutas.js"], /Medicamento\.find\(\)\.lean\(\)/)
+})

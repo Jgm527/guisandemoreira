@@ -126,9 +126,12 @@ export function validateConfiguration(input) {
     if (!/^[a-z][a-z0-9]*$/.test(String(entity.plural ?? "")) || String(entity.plural ?? "").length > 60) {
       errors.push("El nombre plural debe estar en minúsculas, empezar con una letra y contener solo letras y números (por ejemplo, tareas).")
     }
-    if (!/^\/api\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(String(entity.apiPath ?? "")) ||
-        String(entity.apiPath ?? "").length > 100) {
+    const apiPath = String(entity.apiPath ?? "")
+    const expectedApiPath = `/api/${String(entity.plural ?? "")}`
+    if (!/^\/api\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(apiPath) || apiPath.length > 100) {
       errors.push("La ruta REST debe tener el formato /api/recurso (por ejemplo, /api/tareas).")
+    } else if (apiPath !== expectedApiPath) {
+      errors.push(`La ruta REST debe coincidir con la colección: usa ${expectedApiPath}, no ${apiPath}.`)
     }
     if (entity.idField !== "_id") {
       errors.push("Esta versión usa _id, el identificador que Mongoose genera automáticamente.")
@@ -371,7 +374,9 @@ export function validateConfiguration(input) {
     entity: {
       singular: String(entity.singular ?? "").trim() || (resourceMeta ? resourceMeta.singular : ""),
       plural: String(entity.plural ?? "").trim() || (resourceMeta ? existingResource : ""),
-      apiPath: String(entity.apiPath ?? "").trim() || (resourceMeta ? resourceMeta.apiPath : ""),
+      apiPath: resourceMeta
+        ? resourceMeta.apiPath
+        : (`/api/${String(entity.plural ?? "").trim()}`),
       // Los recursos reales pueden identificarse por otro campo (por ejemplo dnipac);
       // las entidades nuevas siempre usan el _id automático de Mongoose.
       idField: resourceMeta ? (resourceMeta.idField || "_id") : "_id",

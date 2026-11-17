@@ -184,7 +184,7 @@ function formConfig() {
       : {
           singular: value("entitySingular"),
           plural: value("entityPlural"),
-          apiPath: value("apiPath"),
+          apiPath: `/api/${value("entityPlural")}`,
           idField: "_id",
         },
     fields,

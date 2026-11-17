@@ -381,6 +381,9 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
   if (hasList) {
     script.push(
       "",
+      "// registrosVisibles es la misma lista completa cargada desde MongoDB.",
+      "const registrosVisibles = registros;",
+      "",
       "// columnCount hace que la fila «No hay registros» ocupe el ancho de toda la tabla.",
       `const columnCount = ${listFields.length + listRelations.length + ((showActions || type === "Detalle") ? 1 : 0)};`,
     )
