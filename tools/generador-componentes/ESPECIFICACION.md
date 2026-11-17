@@ -5,8 +5,12 @@
 Este documento recoge el alcance objetivo del generador local. La primera
 entrega ya implementa un subconjunto explícito: servidor local, formulario
 offline, validación, generación CRUD de entidad nueva, vista previa, escritura
-limitada a `salidas/`, copia de archivos y configuración reutilizable. Las
-funciones no indicadas como implementadas siguen pendientes y la herramienta
+limitada a `salidas/`, copia de archivos y configuración reutilizable. Una
+segunda entrega añade el tipo Relacionado para entidades nuevas: relaciones con
+`ObjectId`/`ref`, validación de referencias en el router, selectores alimentados
+por la API real, consumo de los stores existentes del proyecto y generación de
+stores Pinia propios con botón de compartir selección. Las funciones no
+indicadas como implementadas siguen pendientes y la herramienta
 debe comunicarlas sin simular que están disponibles.
 
 La herramienta se quiere utilizar como ayuda local durante el examen. No debe
@@ -234,6 +238,12 @@ cada campo. Como mínimo:
 - email: formato de email y, cuando corresponda, longitud mínima y máxima;
 - selectores, radio y booleanos: opciones o valores permitidos.
 
+Las expresiones regulares pueden escribirse como patrón sin delimitadores o en
+notación JavaScript `/.../flags`. Deben validarse en el formulario generado y
+en el backend para todo tipo de campo al que se apliquen, incluidos número y
+fecha; no se debe depender del atributo HTML `pattern` cuando el control no lo
+admite.
+
 El generador aplicará las restricciones compatibles tanto en el formulario como
 en el esquema o las rutas del backend que genere. Si una restricción no se puede
 representar de forma equivalente en una capa, debe indicarlo en el resultado y
@@ -286,6 +296,19 @@ Patrones permitidos inicialmente:
 Los ejemplos locales para estudiar estos patrones son las citas relacionadas
 con pacientes y doctores. La versión inicial no pretende generar relaciones
 arbitrarias muchos-a-muchos, transacciones ni un sistema de permisos.
+
+Estado de implementación de este paso: disponible para entidades nuevas y
+pantallas CRUD, Relacionado o Formulario, con estas limitaciones declaradas:
+
+- Las entidades relacionadas son los recursos reales del proyecto con
+  documentos en MongoDB (pacientes, doctores y citas); los catálogos de solo
+  lectura no pueden referenciarse con `ObjectId`.
+- El consumo por Pinia usa los stores que ya existen (`pacienteStore` y
+  `doctorStore`); no se generan stores de entidades relacionadas.
+- El store propio se genera para la entidad de la pantalla, no para las
+  relacionadas.
+- No se generan relaciones con entidades creadas en ejecuciones anteriores,
+  selectores dependientes ni `watch` sobre los stores.
 
 ### Paso 6: operaciones y funciones opcionales
 

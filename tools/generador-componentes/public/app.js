@@ -3,6 +3,11 @@ const panels = [...document.querySelectorAll("[data-step]")]
 const stepLinks = [...document.querySelectorAll("[data-step-link]")]
 const fieldsList = document.querySelector("#fields-list")
 const fieldTemplate = document.querySelector("#field-template")
+const relationsList = document.querySelector("#relations-list")
+const relationTemplate = document.querySelector("#relation-template")
+const piniaEnabled = document.querySelector("#pinia-enabled")
+const piniaFields = document.querySelector("#pinia-fields")
+const piniaHint = document.querySelector("#pinia-hint")
 const validationMessage = document.querySelector("#validation-message")
 const previewMessage = document.querySelector("#preview-message")
 const previewSummary = document.querySelector("#preview-summary")
@@ -13,6 +18,14 @@ const generatedFiles = document.querySelector("#generated-files")
 let currentStep = 0
 let currentPreview = null
 let generatedTextFiles = []
+
+// Resumen de los recursos reutilizables en relaciones; se usa solo para las
+// pistas del formulario, la validación definitiva vive en el servidor.
+const RELATION_RESOURCE_INFO = {
+  pacientes: { label: "Pacientes", hasStore: true },
+  doctores: { label: "Doctores", hasStore: true },
+  citas: { label: "Citas", hasStore: false },
+}
 
 function showStep(index) {
   currentStep = index
@@ -78,8 +91,66 @@ function addField(field = {}) {
   updateFieldType()
 }
 
+function addRelation(relation = {}) {
+  const fragment = relationTemplate.content.cloneNode(true)
+  const card = fragment.querySelector(".field-card")
+  for (const control of card.querySelectorAll("[data-property]")) {
+    const property = control.dataset.property
+    if (property === "selection-hint") continue
+    if (control.type === "checkbox") control.checked = Boolean(relation[property])
+    else if (relation[property] != null) control.value = relation[property]
+  }
+  const selectionControl = card.querySelector('[data-property="selection"]')
+  const resourceControl = card.querySelector('[data-property="resource"]')
+  const hint = card.querySelector('[data-property="selection-hint"]')
+
+  function updateSelectionHint() {
+    const info = RELATION_RESOURCE_INFO[resourceControl.value]
+    if (info && !info.hasStore && selectionControl.value === "pinia") {
+      hint.textContent = `${info.label} no tiene store de Pinia en este proyecto: elige el selector de la API.`
+    } else if (selectionControl.value === "pinia") {
+      hint.textContent = "El formulario enviará la selección que comparten pantallas como XestionPacientes o XestionDoctores (patrón de Citas.vue)."
+    } else {
+      hint.textContent = "El selector carga la lista real del recurso; el modo Pinia usa el store que ya existe en el proyecto."
+    }
+  }
+
+  selectionControl.addEventListener("change", updateSelectionHint)
+  resourceControl.addEventListener("change", updateSelectionHint)
+  card.querySelector(".remove-field").addEventListener("click", () => card.remove())
+  relationsList.append(card)
+  updateSelectionHint()
+}
+
+function syncPiniaSection() {
+  piniaFields.hidden = !piniaEnabled.checked
+  piniaHint.hidden = !piniaEnabled.checked
+}
+
+function renderPiniaFields(savedFields = []) {
+  const names = [...fieldsList.querySelectorAll(".field-card")]
+    .map((card) => card.querySelector('[data-property="name"]')?.value.trim())
+    .filter(Boolean)
+  piniaFields.replaceChildren()
+  for (const name of names) {
+    const label = document.createElement("label")
+    const checkbox = document.createElement("input")
+    checkbox.type = "checkbox"
+    checkbox.dataset.fieldName = name
+    checkbox.checked = savedFields.includes(name)
+    label.append(checkbox, document.createTextNode(` ${name}`))
+    piniaFields.append(label)
+  }
+}
+
+function refreshPiniaFields() {
+  const current = [...piniaFields.querySelectorAll("input:checked")].map((input) => input.dataset.fieldName)
+  renderPiniaFields(current)
+}
+
 function formConfig() {
   const value = (name) => form.elements.namedItem(name).value.trim()
+  const source = form.elements.namedItem("source").value
   const fields = [...fieldsList.querySelectorAll(".field-card")].map((card) => {
     const field = {}
     for (const control of card.querySelectorAll("[data-property]")) {
@@ -89,7 +160,7 @@ function formConfig() {
     return field
   })
   return {
-    source: form.elements.namedItem("source").value,
+    source,
     existingResource: form.elements.namedItem("existingResource").value,
     screen: {
       type: value("screenType"),
@@ -98,14 +169,32 @@ function formConfig() {
       route: value("screenRoute"),
       menuLabel: value("menuLabel"),
     },
-    entity: {
-      singular: value("entitySingular"),
-      plural: value("entityPlural"),
-      apiPath: value("apiPath"),
-      idField: "_id",
-    },
+    // Con un recurso existente no se envían nombres ni ruta de API: los aporta
+    // el propio recurso en el servidor. Enviar los valores por defecto del
+    // formulario hacía creer que había un conflicto de rutas que no existía.
+    entity: source === "existing"
+      ? { singular: "", plural: "", apiPath: "", idField: "_id" }
+      : {
+          singular: value("entitySingular"),
+          plural: value("entityPlural"),
+          apiPath: value("apiPath"),
+          idField: "_id",
+        },
     fields,
     operations: [...form.querySelectorAll('[name="operation"]:checked')].map((input) => input.value),
+    relations: [...relationsList.querySelectorAll(".field-card")].map((card) => {
+      const relation = {}
+      for (const control of card.querySelectorAll("[data-property]")) {
+        const property = control.dataset.property
+        if (property === "selection-hint") continue
+        relation[property] = control.type === "checkbox" ? control.checked : control.value.trim()
+      }
+      return relation
+    }),
+    pinia: {
+      enabled: piniaEnabled.checked,
+      fields: [...piniaFields.querySelectorAll("input:checked")].map((input) => input.dataset.fieldName),
+    },
   }
 }
 
@@ -210,7 +299,6 @@ async function refreshPreview() {
     return currentPreview.collisions.length === 0
   } catch (error) {
     showNotice(validationMessage, error.message, "error", error.details)
-    showStep(2)
     return false
   }
 }
@@ -229,9 +317,10 @@ function validateVisibleStep() {
 async function advance() {
   clearNotice(validationMessage)
   if (!validateVisibleStep()) return
-  if (currentStep === 2) {
+  refreshPiniaFields()
+  if (currentStep === 3) {
     const isValid = await refreshPreview()
-    if (currentPreview) showStep(3)
+    if (currentPreview) showStep(4)
     if (!isValid) return
     return
   }
@@ -277,6 +366,11 @@ function loadConfiguration(config) {
   setFormValue("apiPath", config.entity.apiPath)
   fieldsList.replaceChildren()
   for (const field of config.fields || []) addField(field)
+  relationsList.replaceChildren()
+  for (const relation of config.relations || []) addRelation(relation)
+  piniaEnabled.checked = Boolean(config.pinia?.enabled)
+  renderPiniaFields(config.pinia?.fields || [])
+  syncPiniaSection()
   for (const input of form.querySelectorAll('[name="operation"]')) {
     input.checked = (config.operations || []).includes(input.value)
   }
@@ -367,6 +461,8 @@ async function generate() {
 }
 
 document.querySelector("#add-field").addEventListener("click", () => addField())
+document.querySelector("#add-relation").addEventListener("click", () => addRelation())
+piniaEnabled.addEventListener("change", syncPiniaSection)
 document.querySelectorAll("[data-next]").forEach((button) => button.addEventListener("click", advance))
 document.querySelectorAll("[data-back]").forEach((button) => button.addEventListener("click", () => showStep(Math.max(currentStep - 1, 0))))
 stepLinks.forEach((button) => button.addEventListener("click", () => {
@@ -419,7 +515,7 @@ async function loadProjectStatus() {
     }
     notice.append(lead, list)
     const limitation = document.createElement("p")
-    limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica; las pantallas Relacionadas, los catálogos y el PDF siguen pendientes."
+    limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (referencias ObjectId/ref y stores de Pinia) están disponibles en el paso 4 para entidades nuevas; los catálogos para selectores y el PDF siguen pendientes."
     notice.append(limitation)
     if (status.outputs.length) {
       const outputs = document.createElement("p")

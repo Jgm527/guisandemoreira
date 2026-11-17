@@ -140,6 +140,44 @@ test("genera controles y validaciones para los tipos de campo admitidos", () => 
   assert.match(model, /value === ""/)
 })
 
+test("normaliza regex con barras y valida texto, textarea, número y fecha", () => {
+  const config = validConfiguration()
+  config.fields = [
+    { name: "codigo", label: "Código", type: "text", required: true, defaultValue: "ABC", pattern: "/^[A-Z]{3}$/", form: true, list: true, search: false },
+    { name: "detalle", label: "Detalle", type: "textarea", required: false, defaultValue: "", pattern: "/^[A-Z]{3}$/", form: true, list: true, search: false },
+    { name: "cantidad", label: "Cantidad", type: "number", required: true, defaultValue: "12", pattern: "/^\\d{2}$/", form: true, list: true, search: false },
+    { name: "fecha", label: "Fecha", type: "date", required: true, defaultValue: "2026-02-28", pattern: "/^\\d{4}-\\d{2}-\\d{2}$/", form: true, list: true, search: false },
+  ]
+  config.operations = ["list", "create"]
+
+  const generated = generateFiles(config)
+  const normalized = JSON.parse(generated.files["configuracion.json"])
+  assert.equal(normalized.fields[0].pattern, "^[A-Z]{3}$")
+  assert.equal(normalized.fields[0].patternFlags, "")
+
+  const model = generated.files["backend/modelos/Tarea.js"]
+  assert.match(model, /new RegExp\("\^\[A-Z\]\{3\}\$", ""\)/)
+  assert.match(model, /cantidad: \{ type: Number, required: true, validate:/)
+  assert.doesNotMatch(model, /cantidad: \{[^}]*match:/)
+
+  const component = generated.files["src/components/GestionTareas.vue"]
+  assert.match(component, /type="text" required[^>]*pattern="\^\[A-Z\]\{3\}\$"/)
+  assert.match(component, /<textarea[^>]*><\/textarea>/)
+  assert.doesNotMatch(component, /<textarea[^>]*pattern=/)
+  assert.doesNotMatch(component, /type="number"[^>]*pattern=/)
+  assert.match(component, /campoConFormatoInvalido/)
+  assert.match(component, /new RegExp\(patron, flags\)\.exec\(String\(valor\)\)/)
+  const parsed = parse(component, { filename: "GestionTareas.vue" })
+  assert.deepEqual(parsed.errors, [])
+  assert.doesNotThrow(() => compileScript(parsed.descriptor, { id: "generator-regex-patterns" }))
+  const template = compileTemplate({
+    source: parsed.descriptor.template.content,
+    filename: "GestionTareas.vue",
+    id: "generator-regex-patterns",
+  })
+  assert.deepEqual(template.errors, [])
+})
+
 test("compila los formularios cuando solo se solicita crear o editar", () => {
   for (const operations of [["create"], ["list", "edit"]]) {
     const config = validConfiguration()
@@ -193,9 +231,9 @@ test("permite generar una pantalla que reutiliza un recurso existente sin duplic
   const config = validConfiguration()
   config.source = "existing"
   config.existingResource = "doctores"
-  config.entity.singular = "Doctor"
-  config.entity.plural = "doctores"
-  config.entity.apiPath = "/api/doctores"
+  config.entity.singular = ""
+  config.entity.plural = ""
+  config.entity.apiPath = ""
   config.screen.component = "SeleccionDoctor"
   config.screen.route = "/seleccion-doctor"
   config.screen.title = "Selección de doctor"
@@ -214,6 +252,10 @@ test("permite generar una pantalla que reutiliza un recurso existente sin duplic
     list: true,
     search: true,
   }]
+
+  const validation = validateConfiguration(config)
+  assert.deepEqual(validation.errors, [])
+  assert.equal(validation.config.entity.apiPath, "/api/doctores")
 
   const generated = generateFiles(config)
   assert.deepEqual(Object.keys(generated.files).sort(), [
@@ -252,4 +294,78 @@ test("valida fechas y horas y genera límites de fecha también en Mongoose", ()
   config.fields[0].min = "2026-01-01"
   config.fields[1].defaultValue = "25:61"
   assert.ok(validateConfiguration(config).errors.some((error) => error.includes("formato HH:MM")))
+})
+
+test("el tipo Relacionado genera referencias ObjectId, validarRelaciones y store Pinia", () => {
+  const config = validConfiguration()
+  config.screen.type = "Relacionado"
+  config.screen.component = "GestionRecetas"
+  config.screen.route = "/gestion-recetas"
+  config.screen.title = "Gestión de recetas"
+  config.entity.singular = "Receta"
+  config.entity.plural = "recetas"
+  config.entity.apiPath = "/api/recetas"
+  config.relations = [
+    { resource: "pacientes", fieldName: "pacienteId", label: "Paciente", required: true, selection: "api", filterable: true },
+    { resource: "doctores", fieldName: "doctorId", label: "Doctor", required: true, selection: "pinia" },
+  ]
+  config.pinia = { enabled: true, fields: ["titulo"] }
+
+  const generated = generateFiles(config)
+  assert.deepEqual(Object.keys(generated.files).sort(), [
+    "INSTRUCCIONES.md",
+    "backend/modelos/Receta.js",
+    "backend/rutas/recetas.rutas.js",
+    "configuracion.json",
+    "src/api/recetas.js",
+    "src/components/GestionRecetas.vue",
+    "src/store/recetaStore.js",
+  ])
+  const model = generated.files["backend/modelos/Receta.js"]
+  assert.match(model, /type: mongoose\.Schema\.Types\.ObjectId/)
+  assert.match(model, /ref: "Paciente"/)
+  const routes = generated.files["backend/rutas/recetas.rutas.js"]
+  assert.match(routes, /validarRelaciones/)
+  assert.match(routes, /Paciente\.exists/)
+  assert.match(routes, /filtros\.pacienteId/)
+  const component = generated.files["src/components/GestionRecetas.vue"]
+  assert.match(component, /getPacientes/)
+  assert.match(component, /useDoctorStore/)
+  assert.match(component, /etiquetaPacienteId\(item\)/)
+  assert.match(component, /compartir\(registroActual\)/)
+  const parsed = parse(component, { filename: "GestionRecetas.vue" })
+  assert.deepEqual(parsed.errors, [])
+  assert.doesNotThrow(() => compileScript(parsed.descriptor, { id: "generator-relacionado" }))
+  const template = compileTemplate({
+    source: parsed.descriptor.template.content,
+    filename: "GestionRecetas.vue",
+    id: "generator-relacionado",
+  })
+  assert.deepEqual(template.errors, [])
+  assert.match(generated.files["INSTRUCCIONES.md"], /validarRelaciones/)
+  assert.match(generated.files["INSTRUCCIONES.md"], /seleccionarReceta/)
+})
+
+test("rechaza configuraciones de relación incoherentes", () => {
+  const config = validConfiguration()
+  config.screen.type = "Relacionado"
+  config.relations = [{ resource: "citas", fieldName: "citaId", label: "Cita", selection: "pinia" }]
+  let result = validateConfiguration(config)
+  assert.ok(result.errors.some((error) => error.includes("no tiene un store de Pinia")))
+
+  config.relations = []
+  result = validateConfiguration(config)
+  assert.ok(result.errors.some((error) => error.includes("al menos una relación")))
+
+  config.screen.type = "Listado"
+  config.relations = [{ resource: "pacientes", fieldName: "pacienteId", label: "Paciente", selection: "api" }]
+  result = validateConfiguration(config)
+  assert.ok(result.errors.some((error) => error.includes("CRUD, Relacionado y Formulario")))
+
+  config.screen.type = "Relacionado"
+  config.source = "existing"
+  config.existingResource = "pacientes"
+  config.entity.apiPath = ""
+  result = validateConfiguration(config)
+  assert.ok(result.errors.some((error) => error.includes("solo están disponibles para entidades nuevas")))
 })

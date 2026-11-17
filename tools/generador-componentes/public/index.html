@@ -13,7 +13,7 @@
       <header class="page-header">
         <p class="eyebrow">Herramienta local · sin IA · sin conexión externa</p>
         <h1>Generador de componentes</h1>
-        <p class="intro">Describe una pantalla y obtén archivos explicados para integrar manualmente en este proyecto, con soporte para CRUD, listado, detalle y formularios. Las pantallas relacionadas, los catálogos para selectores y el PDF quedan para fases posteriores.</p>
+        <p class="intro">Describe una pantalla y obtén archivos explicados para integrar manualmente en este proyecto, con soporte para CRUD, listado, detalle, formularios y pantallas relacionadas (referencias ObjectId/ref y stores de Pinia). Los catálogos para selectores y el PDF quedan para fases posteriores.</p>
         <div id="resource-notice" class="notice notice-info" role="status">
           Comprobando los patrones que existen en este proyecto...
         </div>
@@ -23,13 +23,16 @@
         <button type="button" class="step-link is-active" data-step-link="0">1. Pantalla</button>
         <button type="button" class="step-link" data-step-link="1">2. Entidad y campos</button>
         <button type="button" class="step-link" data-step-link="2">3. Operaciones</button>
-        <button type="button" class="step-link" data-step-link="3">4. Revisar y generar</button>
+        <button type="button" class="step-link" data-step-link="3">4. Relaciones y estado</button>
+        <button type="button" class="step-link" data-step-link="4">5. Revisar y generar</button>
       </nav>
+
+      <div id="validation-message" class="notice notice-error" role="alert" hidden></div>
 
       <form id="generator-form" novalidate>
         <section class="step-panel" data-step="0">
           <div class="section-heading">
-            <p class="eyebrow">Paso 1 de 4</p>
+            <p class="eyebrow">Paso 1 de 5</p>
             <h2>¿Qué pantalla quieres crear?</h2>
             <p>El nombre técnico se usa para formar el archivo Vue. La ruta es la dirección que se abrirá en el navegador.</p>
           </div>
@@ -40,9 +43,9 @@
               <option value="Listado">Listado</option>
               <option value="Detalle">Detalle</option>
               <option value="Formulario">Formulario</option>
-              <option value="Relacionado" disabled>Relacionado (no disponible todavía)</option>
+              <option value="Relacionado">Relacionado (con relaciones y Pinia)</option>
             </select>
-            <small id="type-help">La plantilla genera la vista adecuada según el tipo de pantalla y el origen de datos elegido. El tipo Relacionado exige generar relaciones y stores de Pinia que aún no existen, así que permanece deshabilitado.</small>
+            <small id="type-help">La plantilla genera la vista adecuada según el tipo de pantalla y el origen de datos elegido. El tipo Relacionado necesita que declares al menos una relación en el paso 4; las relaciones usan referencias ObjectId/ref con las entidades reales del proyecto.</small>
           </label>
           <label class="field">
             <span>Origen de datos</span>
@@ -94,7 +97,7 @@
 
         <section class="step-panel" data-step="1" hidden>
           <div class="section-heading">
-            <p class="eyebrow">Paso 2 de 4</p>
+            <p class="eyebrow">Paso 2 de 5</p>
             <h2>Define la entidad y sus campos</h2>
             <p>Una entidad es el tipo de dato que guardarás. Esta versión crea una colección nueva y usa el identificador automático <code>_id</code> de MongoDB.</p>
           </div>
@@ -127,7 +130,7 @@
             <button type="button" class="button button-secondary" id="add-field">Añadir campo</button>
           </div>
           <div id="fields-list" class="fields-list" aria-live="polite"></div>
-          <p class="help-panel">Selectores y radios usan opciones fijas en esta fase. Catálogos/API, relaciones y subida de archivos todavía no se generan.</p>
+          <p class="help-panel">Selectores y radios usan opciones fijas en esta fase. Los catálogos/API para selectores y la subida de archivos todavía no se generan; las relaciones con otras entidades se configuran en el paso 4.</p>
           <div class="step-actions">
             <button type="button" class="button button-secondary" data-back>Volver</button>
             <button type="button" class="button button-primary" data-next>Continuar</button>
@@ -136,7 +139,7 @@
 
         <section class="step-panel" data-step="2" hidden>
           <div class="section-heading">
-            <p class="eyebrow">Paso 3 de 4</p>
+            <p class="eyebrow">Paso 3 de 5</p>
             <h2>Elige las operaciones</h2>
             <p>No todas las pantallas necesitan todas las operaciones. Las casillas se validan entre sí para evitar generar acciones sin utilidad y el tipo de pantalla elegido debe coincidir con la lógica que se genera.</p>
           </div>
@@ -148,16 +151,48 @@
             <label class="check-card"><input type="checkbox" name="operation" value="search" checked><span><strong>Buscar</strong><small>Filtrar localmente los datos listados por los campos marcados.</small></span></label>
           </div>
           <p class="help-panel">La validación de campos configurada en el paso anterior se aplicará en el navegador y en el esquema Mongoose. La búsqueda funciona sobre los registros ya cargados, no consulta MongoDB.</p>
-          <div id="validation-message" class="notice notice-error" role="alert" hidden></div>
+          <div class="step-actions">
+            <button type="button" class="button button-secondary" data-back>Volver</button>
+            <button type="button" class="button button-primary" data-next>Continuar</button>
+          </div>
+        </section>
+
+        <section class="step-panel" data-step="3" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Paso 4 de 5</p>
+            <h2>Relaciones y estado compartido</h2>
+            <p>Cada relación guarda el <strong>ObjectId</strong> del documento relacionado (una referencia <code>ref</code> de Mongoose, como <code>pacienteId</code> en las citas). Solo está disponible para entidades nuevas y pantallas CRUD, Relacionado o Formulario.</p>
+          </div>
+
+          <div class="subsection-heading">
+            <div>
+              <h3>Relaciones con otras entidades</h3>
+              <p>El backend comprobará con <code>Modelo.exists()</code> que cada documento relacionado existe antes de guardar.</p>
+            </div>
+            <button type="button" class="button button-secondary" id="add-relation">Añadir relación</button>
+          </div>
+          <div id="relations-list" class="fields-list" aria-live="polite"></div>
+          <p class="help-panel">El selector de la API usa la lista real del recurso (por ejemplo <code>getPacientes</code> de <code>src/api/pacientes.js</code>). El modo Pinia consume la selección compartida que establecen pantallas como XestionPacientes o XestionDoctores; Citas no tiene store, así que solo admite selector.</p>
+
+          <div class="subsection-heading">
+            <div>
+              <h3>Compartir la selección de esta pantalla (Pinia)</h3>
+              <p>Genera <code>src/store/&lt;entidad&gt;Store.js</code> y un botón «Compartir» en la tabla, siguiendo el patrón de <code>doctorStore.js</code>.</p>
+            </div>
+          </div>
+          <label class="check-card"><input type="checkbox" id="pinia-enabled"><span><strong>Generar store Pinia</strong><small>Guarda el identificador del registro compartido y los datos mínimos que marques.</small></span></label>
+          <div id="pinia-fields" class="field-options" hidden></div>
+          <p class="help-panel" id="pinia-hint" hidden>Necesita la operación listar (el botón Compartir vive en la tabla) y al menos un campo definido en el paso 2.</p>
+
           <div class="step-actions">
             <button type="button" class="button button-secondary" data-back>Volver</button>
             <button type="button" class="button button-primary" data-next>Revisar propuesta</button>
           </div>
         </section>
 
-        <section class="step-panel" data-step="3" hidden>
+        <section class="step-panel" data-step="4" hidden>
           <div class="section-heading">
-            <p class="eyebrow">Paso 4 de 4</p>
+            <p class="eyebrow">Paso 5 de 5</p>
             <h2>Revisa antes de generar</h2>
             <p>Confirma los nombres normalizados y la carpeta de salida. No se modificarán archivos de src/ ni de backend/.</p>
           </div>
@@ -212,7 +247,7 @@
           <label class="field"><span>Valor inicial (opcional)</span><input data-property="defaultValue" placeholder="Ej.: pendiente"></label>
           <label class="field"><span>Mínimo (opcional)</span><input data-property="min" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
           <label class="field"><span>Máximo (opcional)</span><input data-property="max" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
-          <label class="field field-wide"><span>Expresión regular (opcional)</span><input data-property="pattern" placeholder="^[A-Za-z0-9 ]+$"><small>Se usa también como regla de validación Mongoose.</small></label>
+          <label class="field field-wide"><span>Expresión regular (opcional)</span><input data-property="pattern" placeholder="/^[A-Z]{3}$/"><small>Acepta el patrón directo o una expresión con barras como en JavaScript. Se valida en el formulario y en Mongoose para texto, número y fecha.</small></label>
           <label class="field field-wide options-field" hidden><span>Opciones fijas</span><textarea data-property="options" rows="3" placeholder="pendiente|Pendiente&#10;completada|Completada"></textarea><small>Una opción por línea, con formato valor|etiqueta.</small></label>
         </div>
         <div class="field-options">
@@ -220,6 +255,36 @@
           <label><input data-property="form" type="checkbox" checked> Formulario</label>
           <label><input data-property="list" type="checkbox"> Mostrar en la tabla</label>
           <label><input data-property="search" type="checkbox"> Incluir en búsqueda</label>
+        </div>
+      </fieldset>
+    </template>
+    <template id="relation-template">
+      <fieldset class="field-card">
+        <legend class="field-card-title">Relación</legend>
+        <button type="button" class="remove-field" aria-label="Eliminar relación">Eliminar</button>
+        <div class="form-grid field-grid">
+          <label class="field"><span>Entidad relacionada</span>
+            <select data-property="resource" required>
+              <option value="">Selecciona una entidad…</option>
+              <option value="pacientes">Pacientes</option>
+              <option value="doctores">Doctores</option>
+              <option value="citas">Citas</option>
+            </select>
+            <small>Debe ser una entidad con documentos en MongoDB (los catálogos de solo lectura no pueden referenciarse).</small>
+          </label>
+          <label class="field"><span>Campo que guarda la referencia</span><input data-property="fieldName" required pattern="[a-z][A-Za-z0-9]*" placeholder="pacienteId"><small>Nombre técnico estable en MongoDB, API y Vue.</small></label>
+          <label class="field"><span>Etiqueta visible</span><input data-property="label" required placeholder="Paciente"></label>
+          <label class="field"><span>Cómo se escoge el registro</span>
+            <select data-property="selection">
+              <option value="api">Selector con la lista de la API</option>
+              <option value="pinia">Selección compartida con Pinia (store existente)</option>
+            </select>
+            <small data-property="selection-hint">El selector carga la lista real del recurso; el modo Pinia usa el store que ya existe en el proyecto.</small>
+          </label>
+        </div>
+        <div class="field-options">
+          <label><input data-property="required" type="checkbox"> Obligatoria</label>
+          <label><input data-property="filterable" type="checkbox"> Filtrar el listado por esta relación</label>
         </div>
       </fieldset>
     </template>

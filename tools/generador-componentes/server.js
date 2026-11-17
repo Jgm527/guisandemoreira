@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { access, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { generateFiles, validateConfiguration } from "./generador.js"
+import { generateFiles, validateConfiguration, relationRequiredFiles } from "./generador.js"
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(TOOL_ROOT, "..", "..")
@@ -187,6 +187,26 @@ async function ensureExistingResourceFiles(config) {
   }
 }
 
+// Las pantallas con relaciones importan módulos y stores reales del proyecto
+// (por ejemplo getPacientes o usepacienteStore); si alguno no existe, la
+// generación se detiene en lugar de fabricar código que no compilaría.
+async function ensureRelationResourceFiles(config) {
+  const missing = []
+  for (const relativePath of relationRequiredFiles(config)) {
+    try {
+      await access(path.resolve(PROJECT_ROOT, relativePath))
+    } catch (error) {
+      if (error.code === "ENOENT") missing.push(relativePath)
+      else throw error
+    }
+  }
+  if (missing.length) {
+    const error = new Error(`Las relaciones de la pantalla necesitan archivos del proyecto que no están disponibles: ${missing.join(", ")}. No se generó nada para evitar código que fallaría al integrarlo.`)
+    error.statusCode = 400
+    throw error
+  }
+}
+
 async function projectStatus() {
   const resources = []
   for (const resource of RESOURCE_REFERENCES) {
@@ -222,6 +242,7 @@ async function handlePreview(request, response) {
 
   const generated = generateFiles(input)
   await ensureExistingResourceFiles(generated.config)
+  await ensureRelationResourceFiles(generated.config)
   const target = getOutputPath(generated.outputSlug)
   const exists = await inspectOutput(target)
   const collisions = await findProjectCollisions(generated.files, generated.config)
@@ -243,6 +264,7 @@ async function handleGenerate(request, response) {
 
   const generated = generateFiles(input)
   await ensureExistingResourceFiles(generated.config)
+  await ensureRelationResourceFiles(generated.config)
   const target = getOutputPath(generated.outputSlug)
   await ensureOutputRoot()
   const exists = await inspectOutput(target)

@@ -29,18 +29,51 @@ indica qué archivos de referencia revisar. Si el recurso ya existe en el
 proyecto, la generación no duplica modelos ni routers, y si algún archivo del
 recurso falta, se detiene y lo explica.
 
+## Pantallas Relacionadas (relaciones y Pinia)
+
+El tipo de pantalla **Relacionado** está disponible para entidades nuevas. En el
+paso 4 del formulario se declaran relaciones con pacientes, doctores o citas y,
+de forma independiente, si la pantalla comparte su propia selección con Pinia:
+
+- Cada relación genera un campo de referencia `{ type: ObjectId, ref: "..." }`
+  en el modelo (patrón de `backend/modelos/Cita.js`) y una llamada a
+  `validarRelaciones()` en el router, que comprueba con `Modelo.exists()` que el
+  documento relacionado existe antes de crear o editar (patrón de
+  `backend/rutas/citas.rutas.js`).
+- Cada relación se escoge con un **selector de la API** (lista real del recurso)
+  o con la **selección compartida** de un store que ya existe en el proyecto
+  (`pacienteStore` y `doctorStore`; Citas no tiene store, así que solo admite
+  selector).
+- Si el listado se marca como filtrable, el router y el módulo de API admiten
+  `?pacienteId=...` igual que `getCitas`.
+- Si se pide compartir la selección, se genera `src/store/<entidad>Store.js`
+  (patrón de `doctorStore.js`) y el componente añade un botón **Compartir** en
+  la tabla; la guía explica cómo consumir el store desde otra pantalla.
+- Antes de generar, el servidor comprueba que los módulos de API y los stores
+  que el componente va a importar existen de verdad; si falta alguno, se
+  detiene y lo explica.
+
+Las relaciones con entidades generadas en ejecuciones anteriores, los
+selectores dependientes (provincia → municipio) y el `watch` sobre los stores
+siguen pendientes y la guía lo indica.
+
 Las confirmaciones, los errores y los mensajes de éxito del componente usan
 `src/utils/alertas.js` (SweetAlert2), la utilidad compartida del proyecto, en
 lugar de `window.confirm` o banners propios.
 
-El tipo de pantalla Relacionado (relaciones, selectores de catálogo y stores de
-Pinia) todavía no está disponible y el formulario lo mantiene deshabilitado.
+Los catálogos para selectores de opciones fijas y la exportación a PDF todavía
+no están disponibles; los campos tipo selector y radio usan opciones que se
+escriben en el formulario.
 
 Las operaciones y campos se configuran en el formulario. La generación se
 detiene si hay errores de validación o coincidencias con los archivos del
 proyecto, y solo se permiten las operaciones que el módulo real de cada recurso
 exporta. Si la carpeta de salida ya existe, se solicita confirmación explícita
 y se reemplaza solo esa carpeta.
+
+Las expresiones regulares admiten tanto el patrón sin delimitadores como la
+notación JavaScript `/.../flags`. Se comprueban al guardar desde el formulario y
+en el modelo Mongoose para campos de texto, número y fecha.
 
 No se modifican archivos del proyecto ni se ejecuta código generado. Las salidas
 se guardan en `tools/generador-componentes/salidas/`, que está excluida de Git.
