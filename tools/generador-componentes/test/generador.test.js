@@ -160,6 +160,66 @@ test("compila los formularios cuando solo se solicita crear o editar", () => {
   }
 })
 
+test("permite generar tipos de pantalla distintos de CRUD en la misma plantilla", () => {
+  const listConfig = validConfiguration()
+  listConfig.screen.type = "Listado"
+  listConfig.operations = ["list", "search"]
+  listConfig.fields[0].form = false
+  const listResult = validateConfiguration(listConfig)
+  assert.equal(listResult.errors.length, 0)
+  const listGenerated = generateFiles(listConfig)
+  assert.match(listGenerated.files["src/components/GestionTareas.vue"], /v-for="registroActual in registrosVisibles"/)
+  assert.doesNotMatch(listGenerated.files["src/components/GestionTareas.vue"], /<form/)
+
+  const formConfig = validConfiguration()
+  formConfig.screen.type = "Formulario"
+  formConfig.operations = ["create"]
+  formConfig.fields[0].list = false
+  formConfig.fields[0].search = false
+  formConfig.fields[0].form = true
+  const formResult = validateConfiguration(formConfig)
+  assert.equal(formResult.errors.length, 0)
+  const formGenerated = generateFiles(formConfig)
+  assert.match(formGenerated.files["src/components/GestionTareas.vue"], /@submit.prevent="guardar"/)
+})
+
+test("permite generar una pantalla que reutiliza un recurso existente sin duplicar backend", () => {
+  const config = validConfiguration()
+  config.source = "existing"
+  config.existingResource = "doctores"
+  config.entity.singular = "Doctor"
+  config.entity.plural = "doctores"
+  config.entity.apiPath = "/api/doctores"
+  config.screen.component = "SeleccionDoctor"
+  config.screen.route = "/seleccion-doctor"
+  config.screen.title = "Selección de doctor"
+  config.operations = ["list"]
+  config.fields = [{
+    name: "apeldoc",
+    label: "Apellidos",
+    type: "text",
+    required: true,
+    defaultValue: "",
+    min: "",
+    max: "",
+    pattern: "",
+    options: "",
+    form: false,
+    list: true,
+    search: true,
+  }]
+
+  const generated = generateFiles(config)
+  assert.deepEqual(Object.keys(generated.files).sort(), [
+    "INSTRUCCIONES.md",
+    "configuracion.json",
+    "src/components/SeleccionDoctor.vue",
+  ])
+  assert.match(generated.files["INSTRUCCIONES.md"], /reutiliza el recurso existente/i)
+  assert.match(generated.files["src/components/SeleccionDoctor.vue"], /getDoctores/)
+  assert.doesNotMatch(generated.files["src/components/SeleccionDoctor.vue"], /mongoose/i)
+})
+
 test("rechaza campos obligatorios fuera del formulario sin valor inicial", () => {
   const config = validConfiguration()
   config.fields[0].form = false

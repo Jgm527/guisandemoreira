@@ -89,6 +89,8 @@ function formConfig() {
     return field
   })
   return {
+    source: form.elements.namedItem("source").value,
+    existingResource: form.elements.namedItem("existingResource").value,
     screen: {
       type: value("screenType"),
       title: value("screenTitle"),
@@ -149,11 +151,13 @@ function clearNotice(element) {
 
 function renderPreview(preview) {
   previewSummary.replaceChildren()
+  const config = formConfig()
   const summaryItems = [
-    ["Pantalla", `${formConfig().screen.title} → ${formConfig().screen.component}.vue`],
-    ["Ruta de navegador", formConfig().screen.route],
-    ["Colección", `${formConfig().entity.plural} (identificador _id)`],
-    ["Ruta REST", formConfig().entity.apiPath],
+    ["Pantalla", `${config.screen.title} → ${config.screen.component}.vue`],
+    ["Ruta de navegador", config.screen.route],
+    ["Origen", config.source === "existing" ? `Recurso existente: ${config.existingResource || "sin elegir"}` : "Entidad nueva"],
+    ["Colección", `${config.entity.plural || config.existingResource || "recurso"} (identificador _id)`],
+    ["Ruta REST", config.entity.apiPath || "Se reutiliza la API existente"],
     ["Carpeta que se escribirá", preview.outputPath],
   ]
   for (const [label, value] of summaryItems) {
@@ -242,6 +246,16 @@ function validateScreenRoute() {
   control.setCustomValidity(isValid ? "" : "Usa una ruta que empiece por / y contenga solo letras, números, /, _ o -.")
 }
 
+function syncSourceSelection() {
+  const sourceValue = form.elements.namedItem("source").value
+  const existingResourceField = document.querySelector("#existing-resource-field")
+  const resourceControl = form.elements.namedItem("existingResource")
+  const shouldShow = sourceValue === "existing"
+  existingResourceField.hidden = !shouldShow
+  resourceControl.disabled = !shouldShow
+  if (!shouldShow) resourceControl.value = ""
+}
+
 function loadConfiguration(config) {
   if (!config || config.version !== 1 || !config.screen || !config.entity) {
     throw new Error("El archivo no tiene el formato de configuración v1 del generador.")
@@ -252,6 +266,8 @@ function loadConfiguration(config) {
   setFormValue("screenRoute", config.screen.route)
   validateScreenRoute()
   setFormValue("menuLabel", config.screen.menuLabel)
+  setFormValue("source", config.source || "new")
+  setFormValue("existingResource", config.existingResource || "")
   setFormValue("entitySingular", config.entity.singular)
   setFormValue("entityPlural", config.entity.plural)
   setFormValue("apiPath", config.entity.apiPath)
@@ -263,6 +279,7 @@ function loadConfiguration(config) {
   clearNotice(generationErrors)
   generatedResult.hidden = true
   currentPreview = null
+  syncSourceSelection()
   showStep(0)
   showNotice(previewMessage, "Configuración cargada. Revisa los pasos antes de volver a generar.", "info")
 }
@@ -377,7 +394,9 @@ document.querySelector("#load-config-input").addEventListener("change", async (e
 
 document.querySelector("#generator-form").addEventListener("submit", (event) => event.preventDefault())
 form.elements.namedItem("screenRoute").addEventListener("input", validateScreenRoute)
+form.elements.namedItem("source").addEventListener("change", syncSourceSelection)
 validateScreenRoute()
+syncSourceSelection()
 
 async function loadProjectStatus() {
   const notice = document.querySelector("#resource-notice")

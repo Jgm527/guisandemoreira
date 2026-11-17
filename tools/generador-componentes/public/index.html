@@ -37,12 +37,32 @@
             <span>Tipo de pantalla</span>
             <select name="screenType" aria-describedby="type-help">
               <option value="CRUD">CRUD (formulario y/o listado)</option>
-              <option value="Listado" disabled>Listado — próximamente</option>
-              <option value="Detalle" disabled>Detalle — próximamente</option>
-              <option value="Formulario" disabled>Formulario — próximamente</option>
-              <option value="Relacionado" disabled>Relacionado — próximamente</option>
+              <option value="Listado">Listado</option>
+              <option value="Detalle">Detalle</option>
+              <option value="Formulario">Formulario</option>
+              <option value="Relacionado">Relacionado</option>
             </select>
-            <small id="type-help">Esta primera entrega genera CRUD para una entidad nueva.</small>
+            <small id="type-help">La plantilla genera la vista adecuada según el tipo de pantalla y el origen de datos elegido.</small>
+          </label>
+          <label class="field">
+            <span>Origen de datos</span>
+            <select name="source">
+              <option value="new">Entidad nueva</option>
+              <option value="existing">Recurso existente</option>
+            </select>
+            <small>Si reutilizas un recurso, la herramienta no crea modelos ni rutas nuevas para evitar duplicados.</small>
+          </label>
+          <label class="field" id="existing-resource-field" hidden>
+            <span>Recurso del proyecto a reutilizar</span>
+            <select name="existingResource">
+              <option value="">Selecciona un recurso…</option>
+              <option value="pacientes">Pacientes</option>
+              <option value="doctores">Doctores</option>
+              <option value="citas">Citas</option>
+              <option value="especialidades">Especialidades</option>
+              <option value="municipios">Municipios</option>
+            </select>
+            <small>La generación consume la API real y deja el trabajo manual necesario muy claro.</small>
           </label>
           <div class="form-grid">
             <label class="field">
