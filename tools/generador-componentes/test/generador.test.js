@@ -57,7 +57,7 @@ test("genera las piezas CRUD y una ruta de salida segura", () => {
   assert.match(generated.files["src/components/GestionTareas.vue"], />Guardar<\/button>/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /Object\.assign\(registro, initialValues, guardado\)/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /editingId\.value = guardado\._id/)
-  assert.doesNotMatch(generated.files["src/components/GestionTareas.vue"], /    limpiar\(\);/)
+  assert.doesNotMatch(generated.files["src/components/GestionTareas.vue"], / limpiar\(\);/)
   assert.match(generated.files["INSTRUCCIONES.md"], /backend\/server\.js/)
 })
 
@@ -349,8 +349,8 @@ test("el tipo Relacionado usa DNI para pacientes y ObjectId para doctores", () =
   const routes = generated.files["backend/rutas/recetas.rutas.js"]
   assert.match(routes, /validarRelaciones/)
   assert.match(routes, /Paciente\.exists\(\{ dnipac: datos\.pacienteDNI \}\)/)
-  assert.match(routes, /filtros\.pacienteDNI/)
-  assert.match(routes, /trim\(\)\.toUpperCase\(\)/)
+  assert.match(routes, /\.find\(\)\.lean\(\)/)
+  assert.doesNotMatch(routes, /req\.query|const filtros|find\(filtros\)/)
   const component = generated.files["src/components/GestionRecetas.vue"]
   assert.match(component, /getPacientes/)
   assert.match(component, /:value="item\.dnipac"/)

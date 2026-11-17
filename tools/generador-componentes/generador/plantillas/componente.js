@@ -67,7 +67,7 @@ export function generateComponent(config) {
   const relations = config.relations
   const apiRelations = relations.filter((relation) => relation.selection === "api")
   const piniaRelations = relations.filter((relation) => relation.selection === "pinia")
-  const listRelations = relations.filter((relation) => relation.filterable)
+  const listRelations = relations
   // Los stores reales del proyecto (pacienteStore, doctorStore) se importan con
   // el nombre exacto que existe en src/store/; se calcula también el nombre de
   // la variable local que usará el componente.
@@ -99,14 +99,13 @@ export function generateComponent(config) {
   if (operations.has("delete")) apiImports.push(resourceDetails.apiFunctions.delete || `delete${singular}`)
   const fieldsInForm = config.fields.filter((field) => field.form)
   const listFields = config.fields.filter((field) => field.list)
-  const searchFields = config.fields.filter((field) => field.search)
   const initialValues = Object.fromEntries([
     ...config.fields.map((field) => [field.name, defaultValue(field)]),
     ...relations.map((relation) => [relation.fieldName, ""]),
   ])
   const scriptImports = ["ref"]
   if (hasForm) scriptImports.push("reactive")
-  if (config.operations.includes("search") || apiRelations.length > 0 || piniaRelations.some((relation) => relation.required)) scriptImports.push("computed")
+  if (apiRelations.length > 0 || piniaRelations.some((relation) => relation.required)) scriptImports.push("computed")
   if (hasList || apiRelations.length) scriptImports.push("onMounted")
   const alertImports = ["alertaError"]
   if (hasForm || operations.has("delete")) alertImports.push("alertaExito")
@@ -173,14 +172,6 @@ export function generateComponent(config) {
         : "",
       '      </div>',
       '    </form>'
-    )
-  }
-  if (config.operations.includes("search")) {
-    componentTemplate.push(
-      '    <!-- La búsqueda filtra la tabla en el navegador; no vuelve a consultar la API. -->',
-      '    <label class="mb-4 grid gap-2">Buscar en los campos configurados',
-      '      <input v-model="searchTerm" class="rounded border border-gray-300 p-2" type="search" placeholder="Escribe para filtrar...">',
-      '    </label>'
     )
   }
   if (hasList) {
@@ -386,29 +377,6 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
       "const registroDetalle = ref(null);",
       "",
     )
-  }
-  if (config.operations.includes("search")) {
-    script.push(
-      "// searchTerm recoge el texto del buscador y lo usa el computed siguiente; no vuelve a",
-      "// llamar a la API, solo filtra los registros que ya están en pantalla.",
-      'const searchTerm = ref("");',
-    )
-  }
-  if (config.operations.includes("search")) {
-    script.push(
-      "",
-      "// computed recalcula la tabla cada vez que cambian los registros o el texto buscado.",
-      "const registrosVisibles = computed(() => {",
-      "  const query = searchTerm.value.trim().toLocaleLowerCase();",
-      "  if (!query) return registros.value;",
-      "  return registros.value.filter((item) =>",
-      `    [${searchFields.map((field) => `item.${field.name}`).join(", ")}]`,
-      '      .some((value) => String(value ?? "").toLocaleLowerCase().includes(query))',
-      "  );",
-      "});",
-    )
-  } else if (hasList) {
-    script.push("", "const registrosVisibles = registros;")
   }
   if (hasList) {
     script.push(

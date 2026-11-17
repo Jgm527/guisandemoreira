@@ -111,7 +111,6 @@ export function generateRoutes(config) {
   const operations = new Set(config.operations)
   const relations = config.relations
   const bodyOperations = operations.has("create") || operations.has("edit")
-  const filterRelations = relations.filter((relation) => relation.filterable)
   const relatedModels = [...new Set(relations.map((relation) => RESOURCE_LIBRARY[relation.resource].refModel))]
   const imports = [
     "import express from \"express\";",
@@ -178,45 +177,18 @@ export function generateRoutes(config) {
   }
 
   if (operations.has("list")) {
-    if (filterRelations.length) {
-      lines.push(
-        "// GET /: devuelve los documentos; admite filtrar por las relaciones indicadas,",
-        "// por ejemplo GET /api/" + slugify(plural) + "?pacienteDNI=...",
-        "router.get(\"/\", async (req, res) => {",
-        "  try {",
-        "    const filtros = {};",
-        ...filterRelations.map((relation) => [
-          `    if (req.query.${relation.fieldName}) {`,
-          `      filtros.${relation.fieldName} = ${RESOURCE_LIBRARY[relation.resource].relationIdField
-    ? `String(req.query.${relation.fieldName}).trim().toUpperCase()`
-    : `req.query.${relation.fieldName}`};`,
-          "    }",
-        ].join("\n")),
-        `    res.json(await ${singular}.find(filtros).lean());`,
-        "  } catch (error) {",
-        "    if (error.name === \"CastError\") {",
-        "      return res.status(400).json({ mensaje: \"El identificador de una relación no es válido\" });",
-        "    }",
-        `    console.error("Error al listar ${config.entity.plural}:", error);`,
-        `    res.status(500).json({ mensaje: "Error al listar ${config.entity.plural}" });`,
-        "  }",
-        "});",
-        ""
-      )
-    } else {
-      lines.push(
-        "// GET /: devuelve todos los documentos de la colección.",
-        "router.get(\"/\", async (req, res) => {",
-        "  try {",
-        `    res.json(await ${singular}.find().lean());`,
-        "  } catch (error) {",
-        `    console.error("Error al listar ${config.entity.plural}:", error);`,
-        `    res.status(500).json({ mensaje: "Error al listar ${config.entity.plural}" });`,
-        "  }",
-        "});",
-        ""
-      )
-    }
+    lines.push(
+      "// GET /: devuelve todos los documentos de la colección, sin filtros.",
+      "router.get(\"/\", async (req, res) => {",
+      "  try {",
+      `    res.json(await ${singular}.find().lean());`,
+      "  } catch (error) {",
+      `    console.error("Error al listar ${config.entity.plural}:", error);`,
+      `    res.status(500).json({ mensaje: "Error al listar ${config.entity.plural}" });`,
+      "  }",
+      "});",
+      ""
+    )
   }
   if (operations.has("create")) {
     lines.push(
@@ -297,7 +269,6 @@ export function generateRoutes(config) {
 export function generateApi(config) {
   const { singular, plural, apiPath } = config.entity
   const operations = new Set(config.operations)
-  const filterRelations = config.relations.filter((relation) => relation.filterable)
   const lines = [
     `// Dónde va: src/api/${slugify(plural)}.js`,
     "// Qué es: la capa API del frontend. Encapsula Axios para que los componentes",
@@ -310,30 +281,16 @@ export function generateApi(config) {
     "",
   ]
   if (operations.has("list")) {
-    if (filterRelations.length) {
-      lines.push(
-        `// GET ${apiPath}: devuelve la lista de ${plural} y admite filtros opcionales por`,
-        `// relación (${filterRelations.map((relation) => relation.fieldName).join(", ")}), igual que getCitas en el proyecto.`,
-        `// El componente llama a esta función dentro de try/catch para mostrar los errores.`,
-        `export async function get${singularPluralName(singular, plural)}(filtros = {}) {`,
-        "  const response = await axios.get(API_URL, { params: filtros });",
-        "  // response.data contiene el array JSON que envió el backend.",
-        "  return response.data;",
-        "}",
-        ""
-      )
-    } else {
-      lines.push(
-        `// GET ${apiPath}: devuelve la lista completa de ${plural}.`,
-        `// El componente llama a esta función dentro de try/catch para mostrar los errores.`,
-        `export async function get${singularPluralName(singular, plural)}() {`,
-        "  const response = await axios.get(API_URL);",
-        "  // response.data contiene el array JSON que envió el backend.",
-        "  return response.data;",
-        "}",
-        ""
-      )
-    }
+    lines.push(
+      `// GET ${apiPath}: devuelve la lista completa de ${plural}, sin filtros.`,
+      `// El componente llama a esta función dentro de try/catch para mostrar los errores.`,
+      `export async function get${singularPluralName(singular, plural)}() {`,
+      "  const response = await axios.get(API_URL);",
+      "  // response.data contiene el array JSON que envió el backend.",
+      "  return response.data;",
+      "}",
+      ""
+    )
   }
   if (operations.has("create")) {
     lines.push(

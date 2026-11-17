@@ -4,7 +4,6 @@ export function generateInstructions(config) {
   const { singular, plural, apiPath } = config.entity
   const { component, route, menuLabel, title, type } = config.screen
   const relations = config.relations
-  const listRelations = relations.filter((relation) => relation.filterable)
   const piniaRelations = relations.filter((relation) => relation.selection === "pinia")
   const ownStoreVariable = config.pinia.enabled
     ? `${singular[0].toLowerCase()}${singular.slice(1)}Store`
@@ -14,7 +13,6 @@ export function generateInstructions(config) {
     create: "crear",
     edit: "editar",
     delete: "borrar",
-    search: "buscar en la lista",
   })[operation]).join(", ")
   const menuFragment = menuLabel
     ? `\n\nPara añadir el enlace del menú, revisa el estilo de [src/components/NavBar.vue](../../../../src/components/NavBar.vue) e inserta dentro de su navegación un enlace como este:\n\n\`\`\`vue\n<RouterLink to="${escapeHtml(route)}">${escapeHtml(menuLabel)}</RouterLink>\n\`\`\`\n`
@@ -23,7 +21,7 @@ export function generateInstructions(config) {
   if (config.source === "existing") {
     const resourceMeta = RESOURCE_LIBRARY[config.existingResource] ?? null
     const resourceLabel = resourceMeta?.label ?? config.existingResource
-    const operationLabels = { list: "listar", create: "crear", edit: "editar", delete: "borrar", search: "buscar en local" }
+    const operationLabels = { list: "listar", create: "crear", edit: "editar", delete: "borrar" }
     const supportedText = resourceMeta
       ? Object.keys(resourceMeta.apiFunctions).map((operation) => operationLabels[operation] ?? operation).join(", ")
       : operationsText
@@ -42,7 +40,9 @@ Las operaciones reales que ofrece este recurso son: ${supportedText}. Si la pant
 
 ${resourceMeta?.catalogOnly
   ? "Esta API es un catálogo de solo lectura: devuelve listas generadas desde un archivo JSON y no trabaja con identificadores por documento, así que la pantalla generada solo consulta y muestra."
-  : `Esta API localiza cada documento por ${config.entity.idField === "_id" ? "`_id`, el identificador automático de MongoDB" : `\`${config.entity.idField}\`, no por \`_id\``}. El componente generado usa \`item.${config.entity.idField}\` como clave de la tabla y al editar o borrar; no uses \`_id\` si el recurso no trabaja con él.`}
+  : (config.entity.idField === "_id"
+      ? "Esta API localiza cada documento por `_id`, el identificador automático de MongoDB."
+      : `Esta API localiza cada documento por \`${config.entity.idField}\`, no por \`_id\`. \`_id\` sigue existiendo en MongoDB, pero no identifica el recurso en esta API.`) + ` El componente generado usa \`item.${config.entity.idField}\` como clave de la tabla y al editar o borrar.`}
 
 ${resourceMeta?.notes ? `**Importante:** ${resourceMeta.notes}\n\n` : ""}## Archivos que fundamentan el patrón
 
@@ -93,101 +93,65 @@ ${menuFragment}
 
 ## Resumen
 
-Se generó una pantalla **${type}** para **${title}**, con operaciones para ${operationsText}. La colección nueva se llamará \`${plural}\`, la API estará en \`${apiPath}\` y MongoDB usará \`_id\` como identificador.${relations.length ? `\n\nLa pantalla declara ${relations.length} ${relations.length === 1 ? "relación" : "relaciones"} con ${relations.map((relation) => RESOURCE_LIBRARY[relation.resource].label.toLowerCase()).join(", ")}; ve la sección «Relaciones» más abajo.` : ""}
+Se generó una pantalla **${type}** para **${title}**, con operaciones para ${operationsText}. La colección nueva se llamará \`${plural}\`, la API estará en \`${apiPath}\` y MongoDB usará \`_id\`.
 
-Esta herramienta solo guarda los archivos en su carpeta de salida. No modifica ni ejecuta el proyecto y no se monta ni se registra automáticamente en la app real.
-
-La integración en backend/server.js, src/router/index.js y src/components/NavBar.vue requiere pasos manuales y revisión de los nombres reales de campos y rutas del proyecto.
+Esta herramienta solo guarda archivos en su carpeta de salida. No modifica ni ejecuta el proyecto y no se monta ni se registra automáticamente en la app real.
 
 ## Archivos generados
 
-- \`backend/modelos/${singular}.js\`: esquema Mongoose (modelo: las reglas y estructura de un documento).${relations.length ? " Incluye las relaciones con el identificador correspondiente: DNI para pacientes y `ObjectId`/`ref` para doctores y citas." : ""}
-- \`backend/rutas/${slugify(plural)}.rutas.js\`: router Express (grupo de endpoints HTTP del recurso).${relations.length ? " Incluye `validarRelaciones()`, que comprueba que cada documento relacionado existe." : ""}
-- \`src/api/${slugify(plural)}.js\`: funciones Axios (capa que envía peticiones a la API).${listRelations.length ? ` El listado admite filtros por relación, por ejemplo \`?${listRelations[0].fieldName}=...\`.` : ""}
-- \`src/components/${component}.vue\`: pantalla Vue con el patrón compatible con ${type}.
-${config.pinia.enabled ? `- \`src/store/${slugify(singular)}Store.js\`: store Pinia que comparte la selección de esta pantalla con otras.\n` : ""}- \`configuracion.json\`: respuestas estructuradas que permiten revisar o volver a generar la propuesta.
-- \`INSTRUCCIONES.md\`: esta guía de integración.
-
-Una **colección** es el conjunto de documentos de ${plural} en MongoDB. Un **endpoint** es una dirección HTTP, por ejemplo \`${apiPath}\`. El **componente** presenta la interfaz; el modelo y el router implementan la persistencia en backend.
-${relations.length ? `
-## Relaciones con otras entidades
-
-${relations.some((relation) => RESOURCE_LIBRARY[relation.resource].relationIdField)
-    ? "Las relaciones guardan el identificador público definido para cada recurso: las de pacientes guardan el DNI (`dnipac`) como texto, igual que `pacienteDNI` en `backend/modelos/Cita.js`; las de doctores y citas guardan el `ObjectId` con referencia `ref` de Mongoose."
-    : "Cada campo de relación guarda el `ObjectId` del documento relacionado como referencia `ref` de Mongoose. MongoDB no copia los datos del documento relacionado, solo su identificador."}
-${relations.map((relation) => {
-  const meta = RESOURCE_LIBRARY[relation.resource]
-  const identifier = meta.relationIdField
-    ? `el campo \`${meta.relationIdField}\` (texto)`
-    : "el ObjectId del documento"
-  const escoger = relation.selection === "api"
-    ? `un **selector** en el formulario, alimentado con \`GET ${meta.apiPath}\` (\`${meta.apiFunctions.list}\` de \`src/api/${meta.apiFile}\`)`
-    : `la **selección compartida** del store \`src/store/${meta.store.file}\` (\`${meta.store.importName}\`)`
-  return `- **${escapeHtml(relation.label)}**: el campo \`${relation.fieldName}\` guarda ${identifier}, ${relation.required ? "obligatorio" : "opcional"}, se escoge con ${escoger}.${relation.filterable ? ` El listado admite \`GET ${apiPath}?${relation.fieldName}=...\`.` : ""}`
-}).join("\n")}
-
-El router generado incluye \`validarRelaciones()\`: antes de crear o editar comprueba que cada documento relacionado existe. Para pacientes busca por \`dnipac\`; para el resto busca por \`_id\`. Si no existe, responde 400 con un mensaje claro.
+- \`backend/modelos/${singular}.js\`: esquema Mongoose.
+- \`backend/rutas/${slugify(plural)}.rutas.js\`: router Express.
+- \`src/api/${slugify(plural)}.js\`: capa Axios que solicita todos los documentos sin filtros.
+- \`src/components/${component}.vue\`: pantalla Vue.
+${config.pinia.enabled ? `- \`src/store/${slugify(singular)}Store.js\`: store Pinia propio.\n` : ""}- \`configuracion.json\`: configuración reutilizable.
 ${config.pinia.enabled ? `
-## Compartir la selección con Pinia
+## Store Pinia propio
 
-- \`src/store/${slugify(singular)}Store.js\` guarda \`id${singular}\` y estos datos mínimos: ${config.pinia.fields.join(", ")}.
-- El botón **Compartir** de la tabla llama a \`seleccionar${singular}(registro)\`, igual que \`XestionDoctores.vue\` llama a \`doctorStore.seleccionarDoctor(doctor)\`.
-- Para consumir la selección desde otra pantalla:
+El componente genera \`seleccionar${singular}(registro)\` y usa \`limpiar${singular}()\` para compartir \`id${singular}\` y los campos mínimos configurados.
+` : ""}${relations.length ? `
+## Relaciones
 
-\`\`\`js
-import { use${singular}Store } from "../store/${slugify(singular)}Store.js";
+El router incluye \`validarRelaciones()\`, que comprueba que los documentos relacionados existen antes de crear o editar. Pacientes se valida por \`dnipac\`; doctores y citas se validan por \`_id\`. Si una referencia no existe, el backend responde 400.
+` : ""}
+## Conectar MongoDB y crear o actualizar la colección
 
-const ${ownStoreVariable} = use${singular}Store();
-// Leer la selección actual:
-console.log(${ownStoreVariable}.id${singular}, ${ownStoreVariable}.${config.pinia.fields[0]});
-// Limpiarla cuando ya no haga falta:
-${ownStoreVariable}.limpiar${singular}();
-\`\`\`
-` : ""}${piniaRelations.length ? `
-## Selección compartida que consume esta pantalla
+1. Comprueba que \`MONGO_URI\` existe en el entorno usado por \`backend/server.js\` y apunta a una base MongoDB disponible.
+2. Una colección nueva se crea al guardar el primer documento. Mongoose usa \`${plural}\` mediante \`collection: "${plural}"\`.
+3. Si amplías una entidad existente, añade los campos nuevos a \`backend/modelos/<Entidad>.js\` antes de usar el formulario. MongoDB no modifica automáticamente los documentos antiguos.
+4. Reinicia backend y frontend después de integrar el modelo y el router.
 
-${piniaRelations.map((relation) => {
-  const meta = RESOURCE_LIBRARY[relation.resource]
-  return `- **${escapeHtml(relation.label)}** (\`${relation.fieldName}\`): el formulario no muestra selector; envía \`${meta.store.importName.slice(3).replace(/^([A-Z])/, (letter) => letter.toLowerCase())}.${meta.store.relationValueProp || meta.store.idProp}\` al guardar. La selección se establece desde las pantallas que comparten ese store y se limpia con \`${meta.store.limpiar}()\`. Si nadie la estableció, el botón Guardar queda desactivado hasta que se seleccione un registro.`;
-}).join("\n")}
-` : ""}` : ""}
+## Integración de backend
 
-## Orden recomendado
-
-1. Copia los archivos generados a las rutas equivalentes del proyecto.
-2. Registra el router en \`backend/server.js\` y conecta su prefijo:
+1. Copia el modelo y el router a sus rutas del proyecto.
+2. En \`backend/server.js\`, importa el router y registra el prefijo:
 
 \`\`\`js
 import ${singular}Rutas from "./rutas/${slugify(plural)}.rutas.js";
 app.use("${apiPath}", requireDatabase, ${singular}Rutas);
 \`\`\`
 
-3. Registra la pantalla en \`src/router/index.js\` (antes de la ruta comodín):
+## Integración de frontend
+
+3. Copia \`src/components/${component}.vue\` al proyecto.
+4. En \`src/router/index.js\`, importa el componente junto a las demás pantallas y añade la ruta antes del comodín:
 
 \`\`\`js
 import ${component} from "../components/${component}.vue";
-
 { path: "${escapeHtml(route)}", name: "${component}", component: ${component} },
 \`\`\`
 ${menuFragment}
 ## Comprobaciones manuales
 
-- Verifica que MongoDB esté conectado y que el proyecto tenga instaladas sus dependencias.
-- Prueba las operaciones seleccionadas: ${operationsText}.
-- Comprueba que los campos obligatorios y sus validaciones respondan en el formulario y en el backend.
-${relations.length ? `- Crea un registro con una referencia válida y prueba después una referencia inventada: el backend debe responder 400 con el mensaje de \`validarRelaciones()\` y el formulario debe mostrarlo con \`alertaError\`.
-${listRelations.length ? `- Filtra el listado con \`GET ${apiPath}?${listRelations[0].fieldName}=...\` y comprueba que la tabla solo muestra los registros de ese registro relacionado.\n` : ""}${piniaRelations.length ? `- Establece la selección en la pantalla que comparte el store (por ejemplo ${piniaRelations.map((relation) => RESOURCE_LIBRARY[relation.resource].label).join(" y ")}) y comprueba que esta pantalla la usa al crear.\n` : ""}${config.pinia.enabled ? `- Pulsa Compartir en una fila y comprueba desde otra pantalla que \`${ownStoreVariable}.id${singular}\` queda disponible; prueba también \`${ownStoreVariable}.limpiar${singular}().\`\n` : ""}` : ""}
-- Verifica errores de red, identificadores inválidos y que la lista se actualice tras crear, editar o borrar.
-- Ejecuta \`npm run build\` después de copiar los archivos. El build comprueba la compilación del frontend; no valida que MongoDB esté disponible ni que los endpoints funcionen.
+- Comprueba \`MONGO_URI\` y que el backend haya iniciado sin errores.
+- Abre la pantalla y verifica que muestra todos los documentos.
+- Crea, edita y elimina un documento de prueba.
+- Comprueba validaciones, relaciones inexistentes y errores de conexión.
+- Ejecuta \`npm run build\` después de integrar los archivos.
 
-## Límites de esta entrega
+## Límites
 
-- El identificador de MongoDB es siempre \`_id\`; no se generan identificadores de negocio.
-- La búsqueda se hace en memoria sobre los registros ya cargados, no en MongoDB.
-- Las restricciones se limitan a las opciones configurables del formulario y al esquema Mongoose generado; revisa las reglas específicas de negocio antes de integrar.
-- Las confirmaciones y los avisos de error o éxito usan la utilidad compartida \`src/utils/alertas.js\` (SweetAlert2), igual que el resto de pantallas del proyecto.
-- La reutilización de recursos existentes queda soportada cuando se elige ese origen; en ese caso la herramienta no duplica backend y usa el identificador real de cada recurso.
-${relations.length || config.pinia.enabled ? `- Las relaciones generadas siguen los patrones de \`backend/modelos/Cita.js\`, \`backend/rutas/citas.rutas.js\` y \`src/store/doctorStore.js\`. Si la pantalla relacionada necesita watch sobre el store o relaciones con entidades nuevas generadas antes, complétalas a mano; esta versión no las genera.
-` : "- No se generan relaciones ni stores de Pinia; usa el paso «Relaciones y estado» del formulario si los necesitas.\n"}- Los catálogos externos para selectores, la ordenación y la exportación a PDF no se generan todavía.
+- El identificador automático es \`_id\`; no se generan identificadores de negocio.
+- El listado no incluye buscador ni filtros.
+- La generación no modifica archivos reales ni prueba MongoDB automáticamente.
 `
 }

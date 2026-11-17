@@ -138,7 +138,7 @@ export const RESOURCE_LIBRARY = {
   },
 }
 
-export const OPERATIONS = new Set(["list", "create", "edit", "delete", "search"])
+export const OPERATIONS = new Set(["list", "create", "edit", "delete"])
 export const SCREEN_TYPES = new Set(["CRUD", "Listado", "Detalle", "Formulario", "Relacionado"])
 // Tipos que admiten declarar relaciones (campos con ObjectId/ref). Listado y
 // Detalle no tienen formulario donde escoger el registro relacionado, así que

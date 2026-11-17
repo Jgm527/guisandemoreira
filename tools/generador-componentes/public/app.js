@@ -377,7 +377,6 @@ addField({
   required: true,
   form: true,
   list: true,
-  search: true,
   max: "80",
 })
 ui.loadProjectStatus()

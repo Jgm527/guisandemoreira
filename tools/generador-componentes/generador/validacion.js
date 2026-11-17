@@ -44,7 +44,6 @@ function normalizeRelation(relation) {
     label: String(relation.label ?? "").trim(),
     required: Boolean(relation.required),
     selection: String(relation.selection ?? "api").trim() || "api",
-    filterable: Boolean(relation.filterable),
   }
 }
 
@@ -67,8 +66,11 @@ export function validateConfiguration(input) {
   const screen = input.screen ?? {}
   const entity = input.entity ?? {}
   const operations = Array.isArray(input.operations)
-    ? [...new Set(input.operations.map(String))]
+    ? [...new Set(input.operations.map(String).filter((operation) => operation !== "search"))]
     : []
+  if (Array.isArray(input.operations) && input.operations.includes("search") && !input.operations.includes("list")) {
+    errors.push("La opción de búsqueda ha sido retirada; añade la operación listar para mostrar todos los registros.")
+  }
   const fields = Array.isArray(input.fields) ? input.fields.map(normalizeField) : []
   const relations = Array.isArray(input.relations) ? input.relations.map(normalizeRelation) : []
   const pinia = normalizePinia(input)
@@ -156,8 +158,8 @@ export function validateConfiguration(input) {
     errors.push("Las pantallas de tipo Formulario no borran registros; elige el tipo CRUD para combinar formulario y tabla.")
   }
   if (String(screen.type ?? "") === "Detalle" &&
-      operations.some((operation) => !["list", "search"].includes(operation))) {
-    errors.push("Las pantallas de tipo Detalle solo muestran un registro: elige listar (y opcionalmente buscar), sin crear, editar ni borrar.")
+      operations.some((operation) => operation !== "list")) {
+    errors.push("Las pantallas de tipo Detalle solo muestran registros: elige listar, sin crear, editar ni borrar.")
   }
   if (["Listado", "Detalle"].includes(String(screen.type ?? "")) && !operations.includes("list")) {
     errors.push("Las pantallas de tipo Listado o Detalle necesitan la operación listar.")
@@ -208,9 +210,6 @@ export function validateConfiguration(input) {
     if (relationMeta && relation.selection === "pinia" && !relationMeta.store) {
       errors.push(`${prefix}: ${relationMeta.label} no tiene un store de Pinia en este proyecto; elige el modo selector de la API.`)
     }
-    if (relation.filterable && !operations.includes("list")) {
-      errors.push(`${prefix}: filtrar el listado por ${relation.fieldName || "la relación"} necesita que la pantalla también liste registros.`)
-    }
   }
 
   if (pinia.enabled) {
@@ -230,14 +229,6 @@ export function validateConfiguration(input) {
     }
     if (!operations.includes("list")) {
       errors.push("Compartir la selección con Pinia necesita la operación listar: el botón Compartir vive en la tabla de registros.")
-    }
-  }
-  if (relations.length && operations.includes("search")) {
-    // La búsqueda local recorre config.fields; los campos de relación muestran
-    // etiquetas calculadas, así que esta versión los deja fuera del buscador.
-    const searchOverlap = relations.filter((relation) => fields.some((field) => field.name === relation.fieldName))
-    if (searchOverlap.length) {
-      errors.push("Los campos de relación no pueden estar también entre los campos de búsqueda: quítalos del buscador o cambia el nombre del campo de la relación.")
     }
   }
   if (operations.includes("search") && !fields.some((field) => field.search)) {

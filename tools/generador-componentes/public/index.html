@@ -148,9 +148,8 @@
             <label class="check-card"><input type="checkbox" name="operation" value="create" checked><span><strong>Crear</strong><small>Guardar un registro nuevo en la colección.</small></span></label>
             <label class="check-card"><input type="checkbox" name="operation" value="edit" checked><span><strong>Editar</strong><small>Actualizar un registro seleccionado por su _id.</small></span></label>
             <label class="check-card"><input type="checkbox" name="operation" value="delete" checked><span><strong>Eliminar</strong><small>Eliminar con confirmación antes de borrar.</small></span></label>
-            <label class="check-card"><input type="checkbox" name="operation" value="search" checked><span><strong>Buscar</strong><small>Filtrar localmente los datos listados por los campos marcados.</small></span></label>
           </div>
-          <p class="help-panel">La validación de campos configurada en el paso anterior se aplicará en el navegador y en el esquema Mongoose. La búsqueda funciona sobre los registros ya cargados, no consulta MongoDB.</p>
+          <p class="help-panel">La validación de campos configurada en el paso anterior se aplicará en el navegador y en el esquema Mongoose. El listado mostrará todos los registros sin un buscador ni filtros.</p>
           <div class="step-actions">
             <button type="button" class="button button-secondary" data-back>Volver</button>
             <button type="button" class="button button-primary" data-next>Continuar</button>
@@ -254,7 +253,6 @@
           <label><input data-property="required" type="checkbox"> Obligatorio</label>
           <label><input data-property="form" type="checkbox" checked> Formulario</label>
           <label><input data-property="list" type="checkbox"> Mostrar en la tabla</label>
-          <label><input data-property="search" type="checkbox"> Incluir en búsqueda</label>
         </div>
       </fieldset>
     </template>
@@ -284,7 +282,6 @@
         </div>
         <div class="field-options">
           <label><input data-property="required" type="checkbox"> Obligatoria</label>
-          <label><input data-property="filterable" type="checkbox"> Filtrar el listado por esta relación</label>
         </div>
       </fieldset>
     </template>
