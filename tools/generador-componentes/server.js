@@ -11,6 +11,7 @@ const OUTPUT_ROOT = path.resolve(TOOL_ROOT, "salidas")
 const HOST = "127.0.0.1"
 const PORT = Number(process.env.COMPONENT_GENERATOR_PORT || 4179)
 const MAX_BODY_BYTES = 1_000_000
+const PUBLIC_MODULES = new Set(["api.js", "ui.js"])
 
 const RESOURCE_REFERENCES = [
   {
@@ -327,6 +328,13 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === "GET" && url.pathname === "/app.js") {
       return await staticFile(response, "app.js", "text/javascript; charset=utf-8")
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/modules/")) {
+      const moduleName = url.pathname.slice("/modules/".length)
+      if (!PUBLIC_MODULES.has(moduleName)) {
+        return send(response, 404, { message: "No se encontró ese archivo." })
+      }
+      return await staticFile(response, path.join("modules", moduleName), "text/javascript; charset=utf-8")
     }
     if (request.method === "GET" && url.pathname === "/styles.css") {
       return await staticFile(response, "styles.css", "text/css; charset=utf-8")

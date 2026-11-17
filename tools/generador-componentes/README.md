@@ -15,6 +15,22 @@ puerto local, define `COMPONENT_GENERATOR_PORT` antes de iniciar Node.
 El servidor escucha únicamente en `127.0.0.1`. Al terminar, vuelve a la terminal
 y pulsa `Ctrl+C`.
 
+## Estructura del generador
+
+- `server.js` gestiona HTTP, validaciones de las solicitudes y escritura segura
+  de las salidas; sirve únicamente los módulos públicos permitidos.
+- `generador.js` conserva la API de generación que usa el servidor y coordina
+  validación y plantillas.
+- `generador/datos.js` centraliza los tipos, metadatos de recursos y utilidades
+  compartidas.
+- `generador/validacion.js` normaliza y valida la configuración antes de
+  generar.
+- `generador/plantillas/` separa las salidas de backend, componente Vue, store
+  e instrucciones.
+- `public/app.js` coordina el formulario y sus pasos; `public/modules/api.js`
+  encapsula las peticiones HTTP y `public/modules/ui.js` concentra la
+  presentación de avisos, vista previa y archivos generados.
+
 ## Primera entrega
 
 La herramienta genera pantallas para una entidad y colección nuevas, con modelo

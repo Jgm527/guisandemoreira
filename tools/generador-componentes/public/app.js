@@ -1,3 +1,6 @@
+import { postJson } from "./modules/api.js"
+import { createUi } from "./modules/ui.js"
+
 const form = document.querySelector("#generator-form")
 const panels = [...document.querySelectorAll("[data-step]")]
 const stepLinks = [...document.querySelectorAll("[data-step-link]")]
@@ -9,15 +12,19 @@ const piniaEnabled = document.querySelector("#pinia-enabled")
 const piniaFields = document.querySelector("#pinia-fields")
 const piniaHint = document.querySelector("#pinia-hint")
 const validationMessage = document.querySelector("#validation-message")
-const previewMessage = document.querySelector("#preview-message")
-const previewSummary = document.querySelector("#preview-summary")
-const generationErrors = document.querySelector("#generation-errors")
 const generateButton = document.querySelector("#generate-button")
-const generatedResult = document.querySelector("#generated-result")
-const generatedFiles = document.querySelector("#generated-files")
 let currentStep = 0
 let currentPreview = null
-let generatedTextFiles = []
+
+const ui = createUi(formConfig)
+const {
+  clearNotice,
+  generationErrors,
+  previewMessage,
+  renderGeneratedFiles,
+  renderPreview,
+  showNotice,
+} = ui
 
 // Resumen de los recursos reutilizables en relaciones; se usa solo para las
 // pistas del formulario, la validación definitiva vive en el servidor.
@@ -198,100 +205,12 @@ function formConfig() {
   }
 }
 
-async function postJson(endpoint, data) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  })
-  const result = await response.json()
-  if (!response.ok) {
-    const error = new Error(result.message || "La solicitud no se pudo completar.")
-    error.details = result.errors || result.collisions || []
-    error.status = response.status
-    error.overwriteRequired = result.overwriteRequired === true
-    throw error
-  }
-  return result
-}
-
-function showNotice(element, message, kind = "info", details = []) {
-  element.hidden = false
-  element.className = `notice notice-${kind}`
-  element.replaceChildren()
-  const paragraph = document.createElement("p")
-  paragraph.textContent = message
-  element.append(paragraph)
-  if (details.length) {
-    const list = document.createElement("ul")
-    for (const detail of details) {
-      const item = document.createElement("li")
-      item.textContent = detail
-      list.append(item)
-    }
-    element.append(list)
-  }
-}
-
-function clearNotice(element) {
-  element.hidden = true
-  element.replaceChildren()
-}
-
-function renderPreview(preview) {
-  previewSummary.replaceChildren()
-  const config = formConfig()
-  const summaryItems = [
-    ["Pantalla", `${config.screen.title} → ${config.screen.component}.vue`],
-    ["Ruta de navegador", config.screen.route],
-    ["Origen", config.source === "existing" ? `Recurso existente: ${config.existingResource || "sin elegir"}` : "Entidad nueva"],
-    ["Colección", config.source === "existing"
-      ? `recurso ${config.existingResource || "elegir"} ya existente (no se duplica)`
-      : `${config.entity.plural || "recurso"} (identificador _id de MongoDB)`],
-    ["Ruta REST", config.source === "existing"
-      ? `${config.entity.apiPath} (API ya existente, no se toca)`
-      : (config.entity.apiPath || "Se reutiliza la API existente")],
-    ["Carpeta que se escribirá", preview.outputPath],
-  ]
-  for (const [label, value] of summaryItems) {
-    const paragraph = document.createElement("p")
-    const strong = document.createElement("strong")
-    strong.textContent = `${label}: `
-    paragraph.append(strong, document.createTextNode(value))
-    previewSummary.append(paragraph)
-  }
-  const fileList = document.createElement("ul")
-  fileList.className = "preview-files"
-  for (const file of preview.files) {
-    const item = document.createElement("li")
-    item.textContent = file
-    fileList.append(item)
-  }
-  previewSummary.append(fileList)
-
-  if (preview.collisions.length) {
-    showNotice(
-      previewMessage,
-      "Se detectaron coincidencias con archivos o rutas que ya existen en el proyecto; para evitar duplicados, cambia el nombre técnico del componente o la ruta de la pantalla. Si lo que quieres es reutilizar un archivo existente, hazlo manualmente.",
-      "error",
-      preview.collisions
-    )
-    generateButton.disabled = true
-  } else if (preview.exists) {
-    showNotice(previewMessage, `La carpeta ${preview.outputPath} ya existe. Al continuar se reemplazará su contenido.`, "warning")
-    generateButton.disabled = false
-  } else {
-    showNotice(previewMessage, "La ruta está disponible y no se detectaron colisiones con archivos del proyecto.", "success")
-    generateButton.disabled = false
-  }
-}
-
 async function refreshPreview() {
   currentPreview = null
   clearNotice(validationMessage)
   clearNotice(previewMessage)
   clearNotice(generationErrors)
-  generatedResult.hidden = true
+  ui.clearGeneratedResult()
   generateButton.disabled = true
   try {
     currentPreview = await postJson("/api/preview", formConfig())
@@ -375,55 +294,11 @@ function loadConfiguration(config) {
     input.checked = (config.operations || []).includes(input.value)
   }
   clearNotice(generationErrors)
-  generatedResult.hidden = true
+  ui.clearGeneratedResult()
   currentPreview = null
   syncSourceSelection()
   showStep(0)
   showNotice(previewMessage, "Configuración cargada. Revisa los pasos antes de volver a generar.", "info")
-}
-
-function renderGeneratedFiles(files, outputPath) {
-  generatedFiles.replaceChildren()
-  generatedTextFiles = files
-  document.querySelector("#result-path").textContent = outputPath
-  document.querySelector("#result-note").textContent =
-    "Estos bloques contienen exactamente los archivos guardados en la carpeta de salida. Usa Copiar en un archivo o el botón para copiarlos todos."
-
-  for (const file of files) {
-    const details = document.createElement("details")
-    details.className = "generated-file"
-    const summary = document.createElement("summary")
-    const name = document.createElement("span")
-    name.textContent = file.path
-    const copyButton = document.createElement("button")
-    copyButton.type = "button"
-    copyButton.className = "copy-file"
-    copyButton.textContent = "Copiar"
-    copyButton.addEventListener("click", async (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      await copyText(file.contents, copyButton)
-    })
-    summary.append(name, copyButton)
-    const code = document.createElement("pre")
-    const codeText = document.createElement("code")
-    codeText.textContent = file.contents
-    code.append(codeText)
-    details.append(summary, code)
-    generatedFiles.append(details)
-  }
-  generatedResult.hidden = false
-}
-
-async function copyText(text, button) {
-  try {
-    await navigator.clipboard.writeText(text)
-    const oldText = button.textContent
-    button.textContent = "Copiado"
-    window.setTimeout(() => { button.textContent = oldText }, 1600)
-  } catch (error) {
-    showNotice(generationErrors, `No se pudo copiar al portapapeles: ${error.message}. Selecciona y copia el contenido del bloque.`, "error")
-  }
 }
 
 async function generate() {
@@ -471,10 +346,7 @@ stepLinks.forEach((button) => button.addEventListener("click", () => {
 }))
 generateButton.addEventListener("click", generate)
 document.querySelector("#copy-all").addEventListener("click", async (event) => {
-  const content = generatedTextFiles
-    .map((file) => `===== ${file.path} =====\n${file.contents}`)
-    .join("\n\n")
-  await copyText(content, event.currentTarget)
+  await ui.copyAll(event.currentTarget)
 })
 document.querySelector("#load-config-button").addEventListener("click", () => {
   document.querySelector("#load-config-input").click()
@@ -498,35 +370,6 @@ form.elements.namedItem("source").addEventListener("change", syncSourceSelection
 validateScreenRoute()
 syncSourceSelection()
 
-async function loadProjectStatus() {
-  const notice = document.querySelector("#resource-notice")
-  try {
-    const response = await fetch("/api/status")
-    if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`)
-    const status = await response.json()
-    notice.replaceChildren()
-    const lead = document.createElement("p")
-    lead.textContent = "Patrones y recursos localizados (solo lectura):"
-    const list = document.createElement("ul")
-    for (const resource of status.resources) {
-      const item = document.createElement("li")
-      item.textContent = `${resource.name}: ${resource.files.join(", ")}`
-      list.append(item)
-    }
-    notice.append(lead, list)
-    const limitation = document.createElement("p")
-    limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (referencias ObjectId/ref y stores de Pinia) están disponibles en el paso 4 para entidades nuevas; los catálogos para selectores y el PDF siguen pendientes."
-    notice.append(limitation)
-    if (status.outputs.length) {
-      const outputs = document.createElement("p")
-      outputs.textContent = `Salidas previas disponibles: ${status.outputs.join(", ")}.`
-      notice.append(outputs)
-    }
-  } catch (error) {
-    showNotice(notice, `No se pudo revisar el proyecto: ${error.message}`, "error")
-  }
-}
-
 addField({
   name: "titulo",
   label: "Título",
@@ -537,4 +380,4 @@ addField({
   search: true,
   max: "80",
 })
-loadProjectStatus()
+ui.loadProjectStatus()
