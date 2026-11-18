@@ -174,6 +174,56 @@ se guardan en `tools/generador-componentes/salidas/`, que está excluida de Git.
 Para repetir una propuesta, usa **Cargar configuración guardada** y selecciona
 su `configuracion.json`.
 
+## Modificar una pantalla que ya existe
+
+Además de crear pantallas nuevas, la herramienta puede modificar las que ya
+están en `src/components`. Arranca igual y se abre en
+<http://127.0.0.1:4179/modificar>.
+
+1. Eliges un componente del proyecto.
+2. La herramienta lo lee y explica qué ha encontrado: formulario y campos, tabla
+   y columnas, objeto reactivo del formulario, objeto que se envía a la API,
+   validación previa al envío, informe PDF y la cadena módulo de API → router →
+   modelo de Mongoose.
+3. Eliges qué añadir y recibes bloques de código con **archivo, línea y el
+   contexto anterior y posterior**: «pega esto entre estas líneas».
+
+Acciones disponibles:
+
+- **Añadir un campo**: modelo Mongoose, lista blanca del router (si el router
+  filtra el cuerpo), control del formulario con las clases de la pantalla,
+  cabecera y celda de la tabla, propiedad del objeto reactivo, clave del objeto
+  de envío cuando la pantalla lo construye a mano, validación si es obligatorio
+  y, opcionalmente, columna del PDF.
+- **Añadir una validación (solo frontend)**: un `computed` nuevo, su enganche en
+  la comprobación que ya bloquea el botón Guardar y el mensaje bajo el campo. No
+  toca el backend.
+- **Informe PDF**: añade un campo al informe existente (cabecera y valor
+  alineados) o crea la exportación a partir de las columnas de la tabla.
+
+Cada pieza se propone solo si existe de verdad. Si un router no tiene lista
+blanca porque acepta el cuerpo entero (como pacientes), lo dice y no genera ese
+parche; si la pantalla envía una copia del estado, tampoco hay que tocar el
+envío.
+
+El análisis usa el compilador real de Vue (`@vue/compiler-sfc` y
+`@vue/compiler-dom`) y `acorn` para el JavaScript. Las tres dependencias ya
+vienen con Vite en este proyecto, así que no hay que instalar nada; si algún día
+se rehace `node_modules`, tienen que seguir presentes.
+
+Nada se escribe en el proyecto: los parches se aplican **en memoria** para
+comprobar que el componente sigue compilando y que el campo aparece en el
+modelo, el router, el formulario, la tabla, el estado y el envío. Lo que el
+analizador no reconoce lo dice explícitamente en lugar de suponerlo.
+
+```powershell
+node --test tools/generador-componentes/test/modificar.test.js
+```
+
+Estas pruebas se ejecutan contra los componentes reales del proyecto: si
+`Citas.vue` o `XestionPacientes.vue` cambian de forma que el analizador deje de
+entenderlos, la suite lo avisa.
+
 ## Pruebas
 
 Desde la raíz del repositorio:

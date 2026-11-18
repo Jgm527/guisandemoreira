@@ -18,6 +18,11 @@ import {
   describeProjectResources,
   inspectExistingResource,
 } from "./generador/recursos-proyecto.js"
+import { normalizarArchivo } from "./analizador/fuentes.js"
+import { analizarPantalla, resumenPantallas } from "./analizador/inventario.js"
+import { inventarioPublico } from "./analizador/publico.js"
+import { generarParches } from "./analizador/parches/registro.js"
+import { verificarParches } from "./analizador/verificar.js"
 
 if (process.argv.includes("--terminal")) {
   if (!process.stdin.isTTY) {
@@ -343,6 +348,85 @@ async function handleGenerate(request, response) {
   })
 }
 
+// El modo «modificar» solo lee. Analiza la pantalla y devuelve los parches que
+// hay que pegar a mano: nunca escribe en src/ ni en backend/.
+function archivoPedido(input) {
+  try {
+    return normalizarArchivo(input?.archivo)
+  } catch (error) {
+    error.statusCode = 400
+    throw error
+  }
+}
+
+async function handleAnalyze(request, response) {
+  const input = await readJson(request)
+  const archivo = archivoPedido(input)
+  let inventario
+  try {
+    inventario = await analizarPantalla({ projectRoot: PROJECT_ROOT, archivo })
+  } catch (error) {
+    error.statusCode = 400
+    throw error
+  }
+  return send(response, 200, { inventario: inventarioPublico(inventario) })
+}
+
+async function handlePatches(request, response) {
+  const input = await readJson(request)
+  const archivo = archivoPedido(input)
+
+  let inventario
+  try {
+    inventario = await analizarPantalla({ projectRoot: PROJECT_ROOT, archivo })
+  } catch (error) {
+    error.statusCode = 400
+    throw error
+  }
+  if (!inventario.aplicable) {
+    return send(response, 400, {
+      message: inventario.motivo || "Esta pantalla no admite cambios automáticos.",
+    })
+  }
+
+  let resultado
+  try {
+    resultado = generarParches(inventario, input?.accion)
+  } catch (error) {
+    error.statusCode = 400
+    throw error
+  }
+
+  const { parches, notas } = resultado
+  if (!parches.length) {
+    return send(response, 400, {
+      message: notas[0] || "No se pudo generar ningún parche para esta pantalla.",
+      errors: notas.slice(1),
+    })
+  }
+
+  const accion = input?.accion ?? {}
+  const esperado = {
+    campo: accion.tipo === "campo" ? accion.nombre : undefined,
+    pdf: accion.tipo === "campo" ? Boolean(accion.enPdf) : accion.tipo === "pdf",
+    pdfEtiqueta: accion.tipo === "pdf" ? (accion.etiqueta || accion.campo) : undefined,
+    validacion: accion.tipo === "validacion" ? `${accion.campo}Invalido` : undefined,
+  }
+  const verificacion = await verificarParches({
+    projectRoot: PROJECT_ROOT,
+    archivo,
+    parches,
+    esperado,
+  })
+
+  return send(response, 200, {
+    parches,
+    notas,
+    verificacion,
+    inventario: inventarioPublico(inventario),
+  })
+}
+
 function staticFile(response, file, contentType) {
   return readFile(path.join(TOOL_ROOT, "public", file))
     .then((contents) => send(response, 200, contents.toString("utf8"), contentType))
@@ -371,11 +455,26 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && url.pathname === "/styles.css") {
       return await staticFile(response, "styles.css", "text/css; charset=utf-8")
     }
+    if (request.method === "GET" && (url.pathname === "/modificar" || url.pathname === "/modificar.html")) {
+      return await staticFile(response, "modificar.html", "text/html; charset=utf-8")
+    }
+    if (request.method === "GET" && url.pathname === "/modificar.js") {
+      return await staticFile(response, "modificar.js", "text/javascript; charset=utf-8")
+    }
     if (request.method === "GET" && url.pathname === "/api/status") {
       return send(response, 200, await projectStatus())
     }
     if (request.method === "POST" && url.pathname === "/api/catalog") {
       return await handleCatalogAnalysis(request, response)
+    }
+    if (request.method === "GET" && url.pathname === "/api/screens") {
+      return send(response, 200, { screens: await resumenPantallas(PROJECT_ROOT) })
+    }
+    if (request.method === "POST" && url.pathname === "/api/analyze") {
+      return await handleAnalyze(request, response)
+    }
+    if (request.method === "POST" && url.pathname === "/api/patch") {
+      return await handlePatches(request, response)
     }
     if (request.method === "POST" && url.pathname === "/api/preview") {
       return await handlePreview(request, response)

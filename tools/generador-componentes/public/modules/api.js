@@ -28,6 +28,13 @@ export async function postCatalogAnalysis(payload) {
   return result
 }
 
+// Lista de pantallas del proyecto para el modo «modificar».
+export async function getScreens() {
+  const response = await fetch("/api/screens")
+  if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`)
+  return response.json()
+}
+
 export async function getProjectStatus() {
   const response = await fetch("/api/status")
   if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`)
