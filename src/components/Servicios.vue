@@ -1,4 +1,5 @@
 <template>
+  <!-- Pagina informativa: cabecera de texto y una rejilla de tarjetas generada desde datos. -->
   <main class="flex flex-1 flex-col gap-8 rounded-lg bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] sm:p-8">
     <header class="mx-auto max-w-3xl text-center">
       <p class="mb-3 text-xs font-bold tracking-[0.14em] text-[#397c70] uppercase">
@@ -12,10 +13,13 @@
       </p>
     </header>
 
+    <!-- grid-cols-1 en movil, 2 en tablet y 3 en escritorio: patron mobile-first de Tailwind.
+         aria-label describe la rejilla completa a quien use lector de pantalla. -->
     <section
       class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
       aria-label="Servicios de la clínica"
     >
+      <!-- Una tarjeta por servicio. :key usa el titulo porque es unico en la lista. -->
       <article
         v-for="servicio in servicios"
         :key="servicio.titulo"
@@ -41,6 +45,12 @@
 </template>
 
 <script setup>
+// Datos de la rejilla. Cada objeto alimenta una tarjeta mediante v-for:
+//   titulo           encabezado de la tarjeta.
+//   descripcion      texto corto del servicio.
+//   imagen           ruta publica de la imagen (se sirve desde public/, no se importa).
+//   textoAlternativo alt de la imagen: obligatorio para accesibilidad.
+// Al anadir un servicio basta con otro objeto; el template no se toca.
 const servicios = [
   {
     titulo: 'Medicina General y Consultas',

@@ -1,5 +1,6 @@
 <template>
   <!-- Texto informativo mostrado al usuario antes de aceptar el tratamiento de datos. -->
+  <!-- Texto estatico por secciones. El componente no tiene script: solo se pinta. -->
   <div class="politica-privacidad">
   <h4>Política de privacidad y confidencialidad</h4>
 <h5>Protección de datos y confidencialidad</h5>
@@ -15,6 +16,7 @@
   de su atención sanitaria y los servicios proporcionados por Sanidade Teis.
 </p>
 
+<!-- Cada h5 separa un bloque tematico; el orden sigue lo que se pide en el formulario. -->
 <h5>¿Qué datos se recopilan?</h5>
 
 <p>
@@ -54,6 +56,7 @@
   acuerdo con las condiciones indicadas.
 </p>
 
+<!-- Aviso final: deja claro que el texto es didactico y no vinculante. -->
 <p class="aviso">
   <strong>Importante:</strong> Este texto tiene carácter informativo y forma
   parte de un proyecto didáctico. No sustituye una política de privacidad

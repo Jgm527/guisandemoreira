@@ -1,9 +1,12 @@
 <template>
+  <!-- Portada: una sola seccion hero con video de fondo y dos llamadas a la accion. -->
   <main class="flex flex-1 flex-col gap-8 rounded-lg bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] sm:gap-10 sm:p-8">
     <section
       class="relative isolate flex min-h-[clamp(27rem,55vh,39rem)] items-center overflow-hidden rounded-2xl bg-[#193b4c] text-white sm:rounded-3xl"
       aria-labelledby="portada-titulo"
     >
+      <!-- Video decorativo: sin controles ni sonido, con poster para el primer segundo.
+           aria-hidden evita que el lector de pantalla lo anuncie. -->
       <video
         class="absolute inset-0 z-0 h-full w-full object-cover object-[center_42%]"
         autoplay
@@ -148,8 +151,15 @@
       </div>
     </section> -->
   </main>
+  <!--
+    Bloque de tarjetas de acceso rapido comentado: se quito porque la portada ya enlaza
+    a pacientes y doctores desde el hero. Para recuperarlo, quita los delimitadores del
+    comentario y comprueba que cada RouterLink apunta a una ruta existente en src/router.
+  -->
 </template>
 
 <script setup>
+// Ruta del video de portada publicada desde public/: Vite la sirve tal cual, sin procesarla.
+// Si el fichero no existe, el navegador muestra el poster definido en el <video>.
 const clinicVideoUrl = '/assets/videos/clinica.mp4'
 </script>
