@@ -40,7 +40,9 @@ export function generateFiles(config) {
 
   if (normalized.source === "existing") {
     files[`src/components/${normalized.screen.component}.vue`] = generateComponent(normalized)
-    files["INSTRUCCIONES.md"] = generateInstructions(normalized)
+    // La guía se genera al final y recibe los archivos reales: así enumera y
+    // muestra el código de cada módulo que de verdad se ha escrito.
+    files["INSTRUCCIONES.md"] = generateInstructions(normalized, files)
     return { files, config: normalized, outputSlug: slugify(normalized.screen.component) }
   }
 
@@ -51,7 +53,7 @@ export function generateFiles(config) {
     files[`src/store/${slugify(singular)}Store.js`] = generateStore(normalized)
   }
   files[`src/components/${normalized.screen.component}.vue`] = generateComponent(normalized)
-  files["INSTRUCCIONES.md"] = generateInstructions(normalized)
+  files["INSTRUCCIONES.md"] = generateInstructions(normalized, files)
   return { files, config: normalized, outputSlug: slugify(normalized.screen.component) }
 }
 

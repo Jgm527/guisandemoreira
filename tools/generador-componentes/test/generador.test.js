@@ -792,6 +792,45 @@ test("genera un catálogo nuevo desde los datos pegados y lo integra en el formu
   assert.deepEqual(template.errors, [])
 })
 
+test("las instrucciones incluyen el código y los enlaces de todas las APIs generadas", () => {
+  const config = validConfiguration()
+  config.entity.singular = "Medicamento"
+  config.entity.plural = "medicamentos"
+  config.entity.apiPath = "/api/medicamentos"
+  config.screen.component = "Medicamentos"
+  config.screen.route = "/medicamentos"
+  config.screen.title = "Medicamentos"
+  config.operations = ["list", "create"]
+  config.fields = [
+    { name: "nombre", label: "Nombre", type: "text", required: true, defaultValue: "", form: true, list: true, search: false },
+    {
+      name: "laboratorio",
+      label: "Laboratorio",
+      type: "catalog",
+      required: true,
+      form: true,
+      list: true,
+      catalog: { source: "inline", name: "laboratorios", data: JSON.stringify([{ id: 1, nombre: "Bayer" }, { id: 2, nombre: "Cinfa" }]) },
+    },
+  ]
+
+  const instructions = generateFiles(config).files["INSTRUCCIONES.md"]
+  // Una entrada por API generada, con su enlace y su código completo.
+  for (const apiFile of ["src/api/medicamentos.js", "src/api/laboratorios.js"]) {
+    assert.ok(instructions.includes("[`" + apiFile + "`](./" + apiFile + ")"), "falta el enlace a " + apiFile)
+    assert.ok(instructions.includes("### `" + apiFile + "`"), "falta la sección de " + apiFile)
+  }
+  assert.match(instructions, /export async function getMedicamentos/)
+  assert.match(instructions, /export async function obtenerLaboratorios/)
+  assert.match(instructions, /app\.use\("\/api\/medicamentos", requireDatabase, MedicamentoRutas\)/)
+  assert.match(instructions, /app\.get\("\/api\/laboratorios"/)
+  assert.match(instructions, /Copia las capas de API de catálogo/)
+  assert.match(instructions, /backend\/data\/laboratorios\.json/)
+  // El orden es explícito y las rutas del repositorio coinciden con las de salida.
+  assert.match(instructions, /## Pasos\n\n1\. Copia/)
+  assert.ok(instructions.indexOf("Copia las capas de API de catálogo") < instructions.indexOf("Copia [`src/components/Medicamentos.vue`]"))
+})
+
 test("reutiliza la API de un catálogo existente sin duplicar backend", () => {
   const config = validConfiguration()
   config.fields = [
