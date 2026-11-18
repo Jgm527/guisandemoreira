@@ -118,7 +118,10 @@ Hay dos orígenes:
   `obtenerEspecialidades()` o `obtenerProvincias()` para la lista `provincias`
   de `municipios.json`).
 - **Datos nuevos**: se pega el JSON o se indica un archivo. El generador crea
-  `backend/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`.
+  `src/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`, que importa el
+  JSON y devuelve la lista. No hay que registrar ninguna ruta en
+  `backend/server.js`: el catálogo viaja con el frontend y funciona aunque el
+  backend o MongoDB estén parados.
 
 El generador analiza la estructura antes de generar y propone la lista del JSON
 (`rootKey`), el campo visible (`labelField`, por ejemplo `nm`), el valor que se

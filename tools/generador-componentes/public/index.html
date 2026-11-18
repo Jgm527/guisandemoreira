@@ -125,7 +125,7 @@
             <button type="button" class="button button-secondary" id="add-field">Añadir campo</button>
           </div>
           <div id="fields-list" class="fields-list" aria-live="polite"></div>
-          <p class="help-panel">Los selectores y radios usan opciones fijas. Un campo de tipo <strong>catálogo</strong> carga su lista de un JSON de <code>backend/data</code>: el generador analiza la estructura, crea la ruta estática y el módulo de API, y dibuja el <code>&lt;select&gt;</code> con <code>v-for</code>. La subida de archivos no se genera; las relaciones con otras entidades se configuran en el paso 4.</p>
+          <p class="help-panel">Los selectores y radios usan opciones fijas. Un campo de tipo <strong>catálogo</strong> carga su lista de un JSON: el generador analiza la estructura y, si los datos son nuevos, crea <code>src/data/&lt;nombre&gt;.json</code> con el módulo de API que lo importa. Así el <code>&lt;select&gt;</code> se llena sin tocar <code>backend/server.js</code> ni depender de MongoDB. La subida de archivos no se genera; las relaciones con otras entidades se configuran en el paso 4.</p>
           <div class="step-actions">
             <button type="button" class="button button-secondary" data-back>Volver</button>
             <button type="button" class="button button-primary" data-next>Continuar</button>
@@ -277,7 +277,7 @@
                 <option value="project">Archivo JSON que ya existe en backend/data</option>
                 <option value="inline">Un archivo JSON nuevo</option>
               </select>
-              <small>El primero reutiliza el catálogo del proyecto; el segundo guarda los datos en backend/data.</small>
+              <small>El primero reutiliza el catálogo del proyecto; el segundo copia los datos a src/data, junto al frontend.</small>
             </label>
             <label class="field" data-catalog-only="project">
               <span>Archivo de datos</span>
@@ -287,7 +287,7 @@
             <label class="field" data-catalog-only="inline">
               <span>Nombre del catálogo</span>
               <input data-property="catalogName" placeholder="especialidades">
-              <small>Se generará backend/data/&lt;nombre&gt;.json y se servirá en /api/&lt;nombre&gt;.</small>
+              <small>Se generará src/data/&lt;nombre&gt;.json y src/api/&lt;nombre&gt;.js; no necesita ruta en el backend.</small>
             </label>
             <label class="field field-wide" data-catalog-only="inline">
               <span>Datos del catálogo (JSON)</span>

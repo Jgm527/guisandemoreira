@@ -346,24 +346,24 @@ export function generateApi(config) {
   return lines.join("\n")
 }
 
-// Módulo de API del catálogo JSON. No hay modelo Mongoose: el backend sirve el
-// archivo de backend/data y esta capa devuelve la lista para el <select>.
+// Módulo de datos del catálogo JSON. No hay modelo Mongoose ni ruta de Express:
+// el JSON se empaqueta con el frontend y se importa directamente, así que la
+// pantalla funciona en cuanto se copian los archivos, sin editar server.js ni
+// depender de que MongoDB esté conectado.
 export function generateCatalogApi(catalog) {
   const functionName = catalog.apiFunction || catalogApiFunctionName(catalog.name)
-  const list = catalog.rootKey ? propertyAccess("respuesta.data", catalog.rootKey) : "respuesta.data"
+  const list = catalog.rootKey ? propertyAccess("datos", catalog.rootKey) : "datos"
   return `// Dónde va: src/api/${catalog.name}.js
-// Qué es: la capa API del catálogo «${catalog.name}». Lee el JSON estático que el
-// backend sirve en /api/${catalog.name} (mismo patrón que src/api/especialidades.js
-// y src/api/municipios.js) y devuelve la lista que alimenta el <select>.
-import axios from "axios";
-
-// Endpoint del catálogo: backend/server.js lee backend/data/${catalog.name}.json y lo devuelve entero.
-const URL = "http://localhost:3000/api/${catalog.name}";
+// Qué es: el módulo de datos del catálogo «${catalog.name}». El JSON se copia a
+// src/data/${catalog.name}.json y viaja con el frontend: este módulo no hace
+// peticiones HTTP, no necesita una ruta en backend/server.js y funciona aunque
+// el backend o MongoDB estén parados. Devuelve la lista que alimenta el <select>.
+import datos from "../data/${catalog.name}.json";
 
 // Devuelve la lista preparada para recorrerla con v-for en el componente.
+// Es async para que el componente la use igual que las API que sí van por HTTP.
 export async function ${functionName}() {
-  const respuesta = await axios.get(URL);
-  // El JSON puede venir envuelto en una clave (por ejemplo { "especialidades": [...] }).
+  // El JSON puede venir envuelto en una clave (por ejemplo { "${catalog.name}": [...] }).
   return ${list};
 }
 `

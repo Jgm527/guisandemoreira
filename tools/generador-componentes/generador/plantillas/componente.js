@@ -432,8 +432,8 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
   }
   if (formCatalogFields.length) {
     script.push(
-      "// Catálogos JSON: cada ref guarda la lista del archivo de backend/data que sirve",
-      "// el backend; los <select> del formulario recorren estas listas.",
+      "// Catálogos JSON: cada ref guarda la lista que devuelve su módulo de",
+      "// src/api/; los <select> del formulario recorren estas listas.",
       ...formCatalogFields.map((field) => `const catalogo${pascalCase(field.name)} = ref([]);`),
       "",
     )
@@ -470,7 +470,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     }
     script.push(
       "// Carga los catálogos de los selectores; cada función viene de su módulo de",
-      "// src/api/ y su archivo JSON se sirve desde backend/data.",
+      "// src/api/ y su JSON vive en src/data (viaja con el frontend).",
       "async function cargarCatalogos() {",
       ...formCatalogFields.flatMap((field) => {
         const loadFunction = field.catalog.apiFunction || catalogApiFunctionName(field.catalog.name)

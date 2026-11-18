@@ -49,7 +49,10 @@ export function catalogNameFromFile(file) {
   return match ? match[1] : ""
 }
 
+// Los catálogos que ya existen en el proyecto viven en backend/data y se sirven
+// por HTTP; los datos nuevos se empaquetan con el frontend en src/data.
 export const catalogDataFile = (name) => `backend/data/${name}.json`
+export const catalogFrontendDataFile = (name) => `src/data/${name}.json`
 export const catalogApiFile = (name) => `src/api/${name}.js`
 export const catalogRoutePath = (name) => `/api/${name}`
 export const catalogApiFunctionName = (name) => `obtener${pascalCase(name)}`

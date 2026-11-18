@@ -26,12 +26,13 @@ export function generateFiles(config) {
     "configuracion.json": `${JSON.stringify(normalized, null, 2)}\n`,
   }
 
-  // Catálogos JSON declarados en los campos. Los datos propios se escriben en
-  // backend/data y el módulo de API solo se genera cuando la pantalla no
-  // reutiliza una función que ya existe en src/api/.
+  // Catálogos JSON declarados en los campos. Los datos propios viajan con el
+  // frontend (src/data) para que no haya que añadir una ruta en server.js; el
+  // módulo de API solo se genera cuando la pantalla no reutiliza una función
+  // que ya existe en src/api/.
   for (const catalog of collectCatalogs(normalized)) {
     if (catalog.source === "inline") {
-      files[`backend/data/${catalog.name}.json`] = catalog.data
+      files[`src/data/${catalog.name}.json`] = catalog.data
     }
     if (!catalog.apiFunction) {
       files[`src/api/${catalog.name}.js`] = generateCatalogApi(catalog)

@@ -162,8 +162,10 @@ Orígenes admitidos:
   `src/api/<nombre>.js` exporta una función sin argumentos para esa lista, se
   reutiliza el módulo en lugar de duplicarlo.
 - **Datos nuevos**: JSON pegado en el formulario o leído de un archivo. Se
-  genera `backend/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>` con
-  su función de carga, y la guía indica la ruta que hay que registrar.
+  genera `src/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`, que
+  importa ese JSON y expone su función de carga. No se añade ni se registra
+  ninguna ruta en `backend/server.js`: el catálogo se empaqueta con el frontend
+  y no depende de MongoDB.
 
 El generador analiza la estructura de los datos para proponer la lista
 (`rootKey`), el campo visible (`labelField`), el valor que se guarda
@@ -427,13 +429,15 @@ se limita siempre a `tools/generador-componentes/salidas/`.
 
 ## 10. Contenido de `INSTRUCCIONES.md`
 
-Cada resultado debe incluir una guía propia, en lenguaje sencillo, que explique:
+Cada resultado debe incluir una guía propia, en lenguaje sencillo, que empiece
+por lo que hay que hacer y deje el material de consulta al final:
 
-1. Resumen de lo que se ha pedido y qué se generó.
-2. Lista de archivos creados y propósito de cada uno.
-3. Significado de modelo, colección, router, endpoint, API Axios, componente y
+1. Frase breve de lo que se ha generado y aviso de que no se integra solo.
+2. Orden recomendado para copiar/crear los archivos, en pasos numerados y con
+   un enlace al archivo de cada paso.
+3. Lista de archivos creados y propósito de cada uno.
+4. Significado de modelo, colección, router, endpoint, API Axios, componente y
    store, aplicado al ejemplo generado.
-4. Orden recomendado para copiar/crear los archivos.
 5. Fragmento exacto para importar y montar una ruta nueva en
    `backend/server.js`, si se generó backend.
 6. Fragmento exacto para importar y registrar la pantalla en
