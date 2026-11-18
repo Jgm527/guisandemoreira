@@ -25,3 +25,5 @@ tools/generador-componentes/salidas/
 *.sw?
 
 .env
+
+material/
