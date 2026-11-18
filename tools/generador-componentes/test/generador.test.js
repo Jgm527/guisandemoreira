@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process"
 import { compileScript, compileTemplate, parse } from "@vue/compiler-sfc"
 import { generateFiles, validateConfiguration } from "../generador.js"
 import { runTerminal } from "../terminal.js"
+import { RESOURCE_LIBRARY } from "../generador/datos.js"
 
 function validConfiguration() {
   return {
@@ -119,6 +120,62 @@ test("el asistente de terminal genera archivos usando el mismo validador", async
     output.destroy()
     await rm(temporary, { recursive: true, force: true })
   }
+})
+
+test("deriva los recursos del proyecto desde src/api/ y detecta funciones que faltan", async () => {
+  const { describeProjectResources, inspectExistingResource, resourceEntries } = await import("../generador/recursos-proyecto.js")
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "generador-recursos-"))
+  try {
+    await mkdir(path.join(temporary, "src", "api"), { recursive: true })
+    await writeFile(path.join(temporary, "src", "api", "pacientes.js"), [
+      "export async function getPacientes() { return []; }",
+      "export async function savePaciente(paciente) { return paciente; }",
+      "export async function modifyPaciente(dni, paciente) { return paciente; }",
+    ].join("\n"))
+
+    // La lista de recursos ya no se repite fuera de datos.js.
+    assert.deepEqual(resourceEntries().map((entry) => entry.key).sort(), Object.keys(RESOURCE_LIBRARY).sort())
+
+    const resources = await describeProjectResources(temporary)
+    const pacientes = resources.find((resource) => resource.key === "pacientes")
+    assert.equal(pacientes.apiFile, "src/api/pacientes.js")
+    assert.equal(pacientes.apiExists, true)
+    assert.deepEqual(pacientes.exportedFunctions.sort(), ["getPacientes", "modifyPaciente", "savePaciente"])
+    assert.deepEqual(pacientes.missingFunctions, [{ operation: "delete", name: "deletePaciente" }])
+    assert.equal(pacientes.usable, false)
+
+    const inspection = await inspectExistingResource(temporary, {
+      source: "existing",
+      existingResource: "pacientes",
+      operations: ["list", "delete"],
+    })
+    assert.ok(inspection.files.includes("backend/modelos/Paciente.js"))
+    assert.deepEqual(inspection.functions, [{ operation: "delete", name: "deletePaciente" }])
+    assert.deepEqual(inspection.available.sort(), ["getPacientes", "modifyPaciente", "savePaciente"])
+  } finally {
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
+
+test("propone funciones por nombre para explicar qué exporta cada módulo", async () => {
+  const { proposeApiFunctions } = await import("../generador/recursos-proyecto.js")
+  assert.deepEqual(
+    proposeApiFunctions([
+      { name: "getCitas", params: 0 },
+      { name: "saveCita", params: 1 },
+      { name: "updateCita", params: 2 },
+      { name: "deleteCita", params: 1 },
+    ]),
+    { list: "getCitas", create: "saveCita", edit: "updateCita", delete: "deleteCita" },
+  )
+  // La lista se llama sin argumentos: obtenerMunicipios(idProvincia) no sirve.
+  assert.deepEqual(
+    proposeApiFunctions([
+      { name: "obtenerMunicipios", params: 1 },
+      { name: "obtenerProvincias", params: 0 },
+    ]),
+    { list: "obtenerProvincias" },
+  )
 })
 
 test("el asistente permite volver a una pregunta, editarla y conservar las respuestas posteriores", async () => {

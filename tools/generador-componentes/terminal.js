@@ -13,6 +13,7 @@ import {
   enrichCatalogs,
   listProjectCatalogFiles,
 } from "./generador/catalogos-proyecto.js"
+import { describeProjectResources, inspectExistingResource } from "./generador/recursos-proyecto.js"
 import { TEXT_PATTERN_PRESETS } from "./public/modules/restricciones.js"
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
@@ -49,6 +50,29 @@ class BackRequested extends Error {}
 
 function writeLine(output, text = "") {
   output.write(`${text}\n`)
+}
+
+// Igual que la interfaz web: los recursos reutilizables se derivan del disco
+// (módulo de src/api/, funciones exportadas y archivos de referencia) en lugar
+// de ofrecerse todos los de la biblioteca. Los incompletos se explican para que
+// se pueda corregir el proyecto antes de intentar generar.
+async function describeReusableResources(projectRoot, output) {
+  const resources = await describeProjectResources(projectRoot)
+  const usable = resources.filter((resource) => resource.usable)
+  const incomplete = resources.filter((resource) =>
+    !resource.usable && (resource.files.length || resource.apiExists))
+  for (const resource of incomplete) {
+    const reasons = []
+    if (!resource.apiExists) reasons.push(`falta ${resource.apiFile}`)
+    const missingFiles = (RESOURCE_LIBRARY[resource.key]?.referenceFiles ?? [])
+      .filter((file) => !resource.files.includes(file))
+    if (missingFiles.length) reasons.push(`faltan ${missingFiles.join(", ")}`)
+    if (resource.missingFunctions.length) {
+      reasons.push(`no exporta ${resource.missingFunctions.map((entry) => entry.name).join(", ")}`)
+    }
+    writeLine(output, `Aviso: ${resource.name} no se ofrece para reutilizar (${reasons.join("; ")}).`)
+  }
+  return usable
 }
 
 function createPrompts(rl, output, navigation) {
@@ -388,13 +412,11 @@ async function askField(index, prompts, output, defaults = {}, context = {}) {
   }
 }
 
-async function askRelation(index, prompts, output) {
+async function askRelation(index, prompts, output, relationResources) {
   const { ask, choose, confirm } = prompts
-  const resources = Object.entries(RESOURCE_LIBRARY)
-    .filter(([, resource]) => !resource.catalogOnly)
-    .map(([value, resource]) => ({ value, label: resource.label }))
+  const resources = relationResources.map((resource) => ({ value: resource.key, label: resource.name }))
   writeLine(output, `\n--- Relación ${index + 1} ---`)
-  const resource = await choose("Entidad relacionada", resources, "pacientes")
+  const resource = await choose("Entidad relacionada", resources, resources[0].value)
   const meta = RESOURCE_LIBRARY[resource]
   const fieldName = await ask("Nombre del campo de relación", index === 0 ? "paciente" : `relacion${index + 1}`)
   const label = await ask("Etiqueta visible", meta.singular)
@@ -409,6 +431,8 @@ async function askRelation(index, prompts, output) {
 
 async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJECT_ROOT) {
   const { ask, choose, chooseMany, confirm, count } = prompts
+  // La lista de recursos sale del proyecto real, no de la biblioteca completa.
+  const projectResources = await describeReusableResources(projectRoot, output)
   writeLine(output, "\n=== 1. Pantalla ===")
   let screenType = await choose("Tipo de pantalla", SCREEN_TYPES, "CRUD")
   const source = await choose("Origen de datos", [
@@ -423,12 +447,19 @@ async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJE
       "CRUD"
     )
   }
-  const existingResource = source === "existing"
-    ? await choose("Recurso del proyecto", Object.entries(RESOURCE_LIBRARY).map(([value, resource]) => ({
-        value,
-        label: resource.label,
-      })), "pacientes")
-    : ""
+  let existingResource = ""
+  if (source === "existing") {
+    if (!projectResources.length) {
+      throw new Error(
+        "No hay recursos completos en el proyecto para reutilizar: revisa src/api/ y los archivos de cada recurso, o elige una entidad nueva.",
+      )
+    }
+    existingResource = await choose(
+      "Recurso del proyecto",
+      projectResources.map((resource) => ({ value: resource.key, label: resource.name })),
+      projectResources[0].key,
+    )
+  }
   const screen = {
     type: screenType,
     title: await ask("Nombre visible de la pantalla", "Gestión de tareas"),
@@ -463,7 +494,7 @@ async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJE
   }
 
   const supportedOperations = source === "existing"
-    ? Object.keys(RESOURCE_LIBRARY[existingResource].apiFunctions)
+    ? projectResources.find((resource) => resource.key === existingResource).operations
     : OPERATIONS.map(({ value }) => value)
   const operationChoices = OPERATIONS.filter(({ value }) => supportedOperations.includes(value))
   writeLine(output, "\n=== 3. Operaciones ===")
@@ -475,17 +506,27 @@ async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJE
 
   writeLine(output, "\n=== 4. Relaciones y Pinia ===")
   const relationsAllowed = source === "new" && ["CRUD", "Relacionado", "Formulario"].includes(screenType)
+  // Los catálogos de solo lectura no se referencian, igual que en la web.
+  const relationResources = projectResources.filter((resource) => !resource.catalogOnly)
   let relations = []
   if (relationsAllowed) {
     const shouldAddRelations = screenType === "Relacionado" || await confirm("¿Quieres añadir relaciones con otras entidades?", false)
-    if (shouldAddRelations) {
+    if (shouldAddRelations && !relationResources.length) {
+      if (screenType === "Relacionado") {
+        throw new Error(
+          "Las pantallas Relacionadas necesitan al menos una entidad completa del proyecto y no se encontró ninguna; revisa src/api/ o elige otro tipo de pantalla.",
+        )
+      }
+      writeLine(output, "No hay entidades completas para relacionar en el proyecto: la pantalla se generará sin relaciones.")
+    }
+    if (shouldAddRelations && relationResources.length) {
       const relationCount = await count("¿Cuántas relaciones? (1-5)", {
         min: 1,
         max: 5,
         defaultValue: 1,
       })
       for (let index = 0; index < relationCount; index += 1) {
-        relations.push(await askRelation(index, prompts, output))
+        relations.push(await askRelation(index, prompts, output, relationResources))
       }
     }
   }
@@ -509,13 +550,17 @@ async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJE
 }
 
 async function checkProjectRequirements(config, projectRoot) {
-  const requiredFiles = config.source === "existing"
-    ? [...(RESOURCE_LIBRARY[config.existingResource]?.referenceFiles ?? [])]
-    : []
+  // Los archivos del recurso reutilizado se comprueban junto con su módulo de
+  // src/api/ y las funciones que la pantalla importará, igual que en la web.
+  const inspection = await inspectExistingResource(projectRoot, config)
+  if (inspection.unknown) {
+    throw new Error(`El recurso ${config.existingResource} no figura entre los recursos conocidos del proyecto.`)
+  }
+  const requiredFiles = []
   requiredFiles.push(...relationRequiredFiles(config))
   // Módulos de catálogo reutilizados: el componente los importa tal cual.
   requiredFiles.push(...catalogRequiredFiles(config))
-  const missing = []
+  const missing = [...inspection.files]
   for (const relativePath of new Set(requiredFiles)) {
     try {
       await access(path.resolve(projectRoot, relativePath))
@@ -526,6 +571,13 @@ async function checkProjectRequirements(config, projectRoot) {
   }
   if (missing.length) {
     throw new Error(`Faltan archivos requeridos del proyecto: ${missing.join(", ")}.`)
+  }
+  if (inspection.functions.length) {
+    const missingFunctions = inspection.functions.map((entry) => entry.name).join(", ")
+    const available = inspection.available.map((name) => `${name}()`).join(", ") || "ninguna"
+    throw new Error(
+      `El recurso ${config.existingResource} no exporta en ${inspection.apiFile} las funciones que la pantalla necesita: ${missingFunctions}. Funciones disponibles: ${available}.`,
+    )
   }
 }
 

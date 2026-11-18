@@ -57,13 +57,8 @@
           </label>
           <label class="field" id="existing-resource-field" hidden>
             <span>Recurso del proyecto a reutilizar</span>
-            <select name="existingResource">
-              <option value="">Selecciona un recurso…</option>
-              <option value="pacientes">Pacientes</option>
-              <option value="doctores">Doctores</option>
-              <option value="citas">Citas</option>
-              <option value="especialidades">Especialidades</option>
-              <option value="municipios">Municipios</option>
+            <select name="existingResource" id="existing-resource">
+              <option value="">Cargando recursos del proyecto…</option>
             </select>
             <small>La generación consume la API real y deja el trabajo manual necesario muy claro.</small>
           </label>
@@ -352,10 +347,7 @@
         <div class="form-grid field-grid">
           <label class="field"><span>Entidad relacionada</span>
             <select data-property="resource" required>
-              <option value="">Selecciona una entidad…</option>
-              <option value="pacientes">Pacientes</option>
-              <option value="doctores">Doctores</option>
-              <option value="citas">Citas</option>
+              <option value="">Cargando entidades del proyecto…</option>
             </select>
             <small>Debe ser una entidad con documentos en MongoDB (los catálogos de solo lectura no pueden referenciarse).</small>
           </label>

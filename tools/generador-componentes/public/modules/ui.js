@@ -145,7 +145,10 @@ export function createUi(getConfiguration) {
       const list = document.createElement("ul")
       for (const resource of status.resources) {
         const item = document.createElement("li")
-        item.textContent = `${resource.name}: ${resource.files.join(", ")}`
+        const missing = resource.missingFunctions?.length
+          ? ` (no exporta ${resource.missingFunctions.map((entry) => entry.name).join(", ")})`
+          : ""
+        item.textContent = `${resource.name}: ${resource.files.join(", ")}${missing}`
         list.append(item)
       }
       notice.append(lead, list)

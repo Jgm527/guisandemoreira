@@ -26,13 +26,9 @@ const {
   showNotice,
 } = ui
 
-// Resumen de los recursos reutilizables en relaciones; se usa solo para las
-// pistas del formulario, la validación definitiva vive en el servidor.
-const RELATION_RESOURCE_INFO = {
-  pacientes: { label: "Pacientes", hasStore: true },
-  doctores: { label: "Doctores", hasStore: true },
-  citas: { label: "Citas", hasStore: false },
-}
+// Recursos del proyecto tal como los devuelve /api/status: los selects de
+// origen y de relaciones se llenan con lo que existe de verdad en src/api/.
+let projectResources = []
 
 // Los controles del panel de catálogo se envían anidados en field.catalog, que
 // es lo que valida y consume el generador. El archivo elegido se añade aparte
@@ -279,6 +275,68 @@ function fillSelect(select, options, value, fallback = "") {
   select.value = available.some((option) => option.value === desired) ? desired : available[0]?.value ?? ""
 }
 
+// Los recursos reutilizables salen de /api/status, no de una lista escrita a
+// mano: si el proyecto añade o pierde un recurso, el formulario lo refleja.
+function fillExistingResourceOptions() {
+  const select = form.elements.namedItem("existingResource")
+  if (!select) return
+  const options = projectResources.filter((resource) => resource.usable)
+  if (!options.length) {
+    select.replaceChildren(new Option("No hay recursos completos en el proyecto; revisa el aviso de la cabecera", ""))
+    return
+  }
+  const previous = select.value
+  const placeholder = select.options[0]?.value === "" ? select.options[0].textContent : "Selecciona un recurso…"
+  select.replaceChildren(new Option(placeholder, ""), ...options.map((resource) => new Option(resource.name, resource.key)))
+  if (previous && options.some((resource) => resource.key === previous)) select.value = previous
+}
+
+// Relaciones: solo entidades con documentos (los catálogos de solo lectura no se
+// referencian) y el modo Pinia solo si el store existe de verdad.
+function fillRelationResourceOptions(card) {
+  if (!card) return
+  const resourceControl = card.querySelector('[data-property="resource"]')
+  const selectionControl = card.querySelector('[data-property="selection"]')
+  if (!resourceControl) return
+  const options = projectResources.filter((resource) => resource.usable && !resource.catalogOnly)
+  if (!options.length) {
+    resourceControl.replaceChildren(new Option("No hay entidades completas en el proyecto; revisa el aviso de la cabecera", ""))
+  } else {
+    const previous = resourceControl.value
+    const placeholder = resourceControl.options[0]?.value === ""
+      ? resourceControl.options[0].textContent
+      : "Selecciona una entidad…"
+    resourceControl.replaceChildren(new Option(placeholder, ""), ...options.map((resource) => new Option(resource.name, resource.key)))
+    resourceControl.value = options.some((resource) => resource.key === previous) ? previous : ""
+  }
+  const info = projectResources.find((resource) => resource.key === resourceControl.value)
+  const piniaOption = selectionControl?.querySelector('option[value="pinia"]')
+  if (piniaOption) piniaOption.disabled = info ? !info.hasStore : false
+  if (info && !info.hasStore && selectionControl.value === "pinia") selectionControl.value = "api"
+}
+
+function markResourceSelectsUnavailable() {
+  const existing = form.elements.namedItem("existingResource")
+  if (existing) existing.replaceChildren(new Option("No se pudieron cargar los recursos del proyecto", ""))
+  for (const card of relationsList.querySelectorAll(".field-card")) {
+    const select = card.querySelector('[data-property="resource"]')
+    if (select) select.replaceChildren(new Option("No se pudieron cargar las entidades del proyecto", ""))
+  }
+}
+
+async function loadProjectResources() {
+  try {
+    const status = await getProjectStatus()
+    projectResources = Array.isArray(status.resources) ? status.resources : []
+  } catch {
+    projectResources = []
+    markResourceSelectsUnavailable()
+    return
+  }
+  fillExistingResourceOptions()
+  for (const card of relationsList.querySelectorAll(".field-card")) fillRelationResourceOptions(card)
+}
+
 // Rellena el selector de archivos con los JSON que el servidor encontró en
 // backend/data y conserva el valor guardado aunque el archivo aún no exista.
 function syncCatalogFileOptions(card, desired = card.querySelector("[data-catalog-file]")?.value ?? "") {
@@ -444,9 +502,9 @@ function addRelation(relation = {}) {
   const hint = card.querySelector('[data-property="selection-hint"]')
 
   function updateSelectionHint() {
-    const info = RELATION_RESOURCE_INFO[resourceControl.value]
+    const info = projectResources.find((resource) => resource.key === resourceControl.value)
     if (info && !info.hasStore && selectionControl.value === "pinia") {
-      hint.textContent = `${info.label} no tiene store de Pinia en este proyecto: elige el selector de la API.`
+      hint.textContent = `${info.name} no tiene store de Pinia en este proyecto: elige el selector de la API.`
     } else if (selectionControl.value === "pinia") {
       hint.textContent = "El formulario enviará la selección que comparten pantallas como XestionPacientes o XestionDoctores (patrón de Citas.vue)."
     } else {
@@ -455,9 +513,13 @@ function addRelation(relation = {}) {
   }
 
   selectionControl.addEventListener("change", updateSelectionHint)
-  resourceControl.addEventListener("change", updateSelectionHint)
+  resourceControl.addEventListener("change", () => {
+    fillRelationResourceOptions(card)
+    updateSelectionHint()
+  })
   card.querySelector(".remove-field").addEventListener("click", () => card.remove())
   relationsList.append(card)
+  fillRelationResourceOptions(card)
   updateSelectionHint()
 }
 
@@ -729,5 +791,6 @@ addField({
   list: true,
   max: "80",
 })
+await loadProjectResources()
 ui.loadProjectStatus()
 loadProjectCatalogs()

@@ -14,6 +14,10 @@ import {
   listProjectCatalogFiles,
   publicCatalogAnalysis,
 } from "./generador/catalogos-proyecto.js"
+import {
+  describeProjectResources,
+  inspectExistingResource,
+} from "./generador/recursos-proyecto.js"
 
 if (process.argv.includes("--terminal")) {
   if (!process.stdin.isTTY) {
@@ -32,39 +36,6 @@ const HOST = "127.0.0.1"
 const PORT = Number(process.env.COMPONENT_GENERATOR_PORT || 4179)
 const MAX_BODY_BYTES = 1_000_000
 const PUBLIC_MODULES = new Set(["api.js", "ui.js", "restricciones.js"])
-
-const RESOURCE_REFERENCES = [
-  {
-    key: "pacientes",
-    name: "Pacientes",
-    apiFile: "pacientes.js",
-    files: ["src/api/pacientes.js", "backend/modelos/Paciente.js", "backend/rutas/pacientes.rutas.js"],
-  },
-  {
-    key: "doctores",
-    name: "Doctores",
-    apiFile: "doctores.js",
-    files: ["src/api/doctores.js", "backend/modelos/Doctor.js", "backend/rutas/doctores.rutas.js"],
-  },
-  {
-    key: "citas",
-    name: "Citas",
-    apiFile: "citas.js",
-    files: ["src/api/citas.js", "backend/modelos/Cita.js", "backend/rutas/citas.rutas.js"],
-  },
-  {
-    key: "especialidades",
-    name: "Especialidades",
-    apiFile: "especialidades.js",
-    files: ["src/api/especialidades.js", "backend/data/especialidades.json"],
-  },
-  {
-    key: "municipios",
-    name: "Municipios",
-    apiFile: "municipios.js",
-    files: ["src/api/municipios.js", "backend/data/municipios.json"],
-  },
-]
 
 function send(response, status, body, contentType = "application/json; charset=utf-8") {
   response.writeHead(status, {
@@ -181,28 +152,27 @@ async function findProjectCollisions(files, config) {
   return matches
 }
 
-// Para pantallas que reutilizan un recurso real, comprueba que sus archivos
-// existen de verdad; si falta alguno, las funciones importadas no están
-// garantizadas y la generación se detiene en lugar de fingir que funcionará.
+// Para pantallas que reutilizan un recurso real, comprueba que sus archivos,
+// su módulo de src/api/ y las funciones que el componente va a importar existen
+// de verdad; si falta algo, la generación se detiene en lugar de fingir que
+// funcionará.
 async function ensureExistingResourceFiles(config) {
   if (config.source !== "existing") return
-  const reference = RESOURCE_REFERENCES.find((item) => item.key === config.existingResource)
-  if (!reference) {
+  const inspection = await inspectExistingResource(PROJECT_ROOT, config)
+  if (inspection.unknown) {
     const error = new Error("El recurso solicitado no figura entre los recursos conocidos del proyecto.")
     error.statusCode = 400
     throw error
   }
-  const missing = []
-  for (const relativePath of reference.files) {
-    try {
-      await access(path.resolve(PROJECT_ROOT, relativePath))
-    } catch (error) {
-      if (error.code === "ENOENT") missing.push(relativePath)
-      else throw error
-    }
+  if (inspection.files.length) {
+    const error = new Error(`El recurso ${config.existingResource} no está completo en el proyecto; faltan: ${inspection.files.join(", ")}. No se puede garantizar que las funciones importadas existan, así que no se generó nada.`)
+    error.statusCode = 400
+    throw error
   }
-  if (missing.length) {
-    const error = new Error(`El recurso ${reference.name} no está completo en el proyecto; faltan: ${missing.join(", ")}. No se puede garantizar que las funciones importadas existan, así que no se generó nada.`)
+  if (inspection.functions.length) {
+    const missing = inspection.functions.map((entry) => entry.name).join(", ")
+    const available = inspection.available.map((name) => `${name}()`).join(", ") || "ninguna"
+    const error = new Error(`El recurso ${config.existingResource} no exporta en ${inspection.apiFile} las funciones que la pantalla necesita: ${missing}. Funciones disponibles: ${available}. Revisa src/api/ o ajusta las operaciones antes de generar.`)
     error.statusCode = 400
     throw error
   }
@@ -229,19 +199,23 @@ async function ensureRelationResourceFiles(config) {
 }
 
 async function projectStatus() {
-  const resources = []
-  for (const resource of RESOURCE_REFERENCES) {
-    const files = []
-    for (const relativePath of resource.files) {
-      try {
-        await access(path.resolve(PROJECT_ROOT, relativePath))
-        files.push(relativePath)
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error
-      }
-    }
-    if (files.length) resources.push({ name: resource.name, files })
-  }
+  // El estado sale de los archivos reales: la lista de recursos no se repite
+  // aquí, se deriva de la biblioteca y se contrasta con src/api/.
+  const resources = (await describeProjectResources(PROJECT_ROOT))
+    .filter((resource) => resource.files.length)
+    .map(({ key, name, files, apiFile, apiExists, operations, missingFunctions, catalogOnly, hasStore, idField, usable }) => ({
+      key,
+      name,
+      files,
+      apiFile,
+      apiExists,
+      operations,
+      missingFunctions,
+      catalogOnly,
+      hasStore,
+      idField,
+      usable,
+    }))
 
   let outputs = []
   try {
