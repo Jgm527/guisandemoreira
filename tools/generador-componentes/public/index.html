@@ -125,7 +125,7 @@
             <button type="button" class="button button-secondary" id="add-field">Añadir campo</button>
           </div>
           <div id="fields-list" class="fields-list" aria-live="polite"></div>
-          <p class="help-panel">Los selectores y radios usan opciones fijas. Un campo de tipo <strong>catálogo</strong> carga su lista de un JSON: el generador analiza la estructura y, si los datos son nuevos, crea <code>backend/data/&lt;nombre&gt;.json</code> y el módulo Axios de <code>src/api/</code> que lo pide a <code>/api/&lt;nombre&gt;</code>. La guía incluye la ruta GET que hay que añadir a <code>backend/server.js</code>; no depende de MongoDB. La subida de archivos no se genera; las relaciones con otras entidades se configuran en el paso 4.</p>
+          <p class="help-panel">Los selectores y radios usan opciones fijas. Un campo de tipo <strong>catálogo</strong> carga su lista de un JSON: el generador analiza la estructura y, si los datos son nuevos, crea <code>backend/data/&lt;nombre&gt;.json</code> y el módulo de <code>src/api/</code> que lo importa directamente. No hay que añadir rutas a <code>backend/server.js</code> ni depende de MongoDB. La subida de archivos no se genera; las relaciones con otras entidades se configuran en el paso 4.</p>
           <div class="step-actions">
             <button type="button" class="button button-secondary" data-back>Volver</button>
             <button type="button" class="button button-primary" data-next>Continuar</button>
@@ -287,7 +287,7 @@
             <label class="field" data-catalog-only="inline">
               <span>Nombre del catálogo</span>
               <input data-property="catalogName" placeholder="especialidades">
-              <small>Se generará backend/data/&lt;nombre&gt;.json y src/api/&lt;nombre&gt;.js; la guía indica la ruta GET que lo sirve.</small>
+              <small>Se generará backend/data/&lt;nombre&gt;.json y src/api/&lt;nombre&gt;.js, que importa el JSON directamente.</small>
             </label>
             <label class="field field-wide" data-catalog-only="inline">
               <span>Datos del catálogo (JSON)</span>

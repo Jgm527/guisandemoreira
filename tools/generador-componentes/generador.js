@@ -27,9 +27,9 @@ export function generateFiles(config) {
   }
 
   // Catálogos JSON declarados en los campos. Los datos nuevos se guardan en
-  // backend/data, junto a los catálogos del proyecto, y el backend los sirve en
-  // /api/<nombre>; el módulo de API solo se genera cuando la pantalla no
-  // reutiliza una función que ya existe en src/api/.
+  // backend/data, junto a los catálogos del proyecto, y el módulo generado en
+  // src/api/ importa ese JSON directamente (sin ruta en el backend); el módulo
+  // solo se genera cuando la pantalla no reutiliza una función ya existente.
   for (const catalog of collectCatalogs(normalized)) {
     if (catalog.source === "inline") {
       files[`backend/data/${catalog.name}.json`] = catalog.data

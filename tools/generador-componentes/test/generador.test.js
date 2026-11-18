@@ -780,11 +780,10 @@ test("genera un catálogo nuevo desde los datos pegados y lo integra en el formu
   assert.ok(generated.files["backend/data/provincias.json"])
   assert.equal(generated.files["src/data/provincias.json"], undefined)
   assert.ok(generated.files["src/api/provincias.js"])
-  // El módulo pide la lista al backend con Axios; no importa el JSON.
-  assert.match(generated.files["src/api/provincias.js"], /const API_URL = "http:\/\/localhost:3000\/api\/provincias"/)
-  assert.match(generated.files["src/api/provincias.js"], /return respuesta\.data\.provincias/)
-  assert.match(generated.files["src/api/provincias.js"], /axios/)
-  assert.doesNotMatch(generated.files["src/api/provincias.js"], /import datos from/)
+  // El módulo importa el JSON generado: no necesita ruta ni Axios.
+  assert.match(generated.files["src/api/provincias.js"], /import catalogo from "\.\.\/\.\.\/backend\/data\/provincias\.json"/)
+  assert.match(generated.files["src/api/provincias.js"], /return catalogo\.provincias/)
+  assert.doesNotMatch(generated.files["src/api/provincias.js"], /axios/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /catalogoProvincia\.value = await obtenerProvincias\(\)/)
   assert.match(generated.files["backend/modelos/Tarea.js"], /provincia: \{ type: String, required: true, trim: true \}/)
   const component = generated.files["src/components/GestionTareas.vue"]
@@ -795,9 +794,9 @@ test("genera un catálogo nuevo desde los datos pegados y lo integra en el formu
   const instructions = generated.files["INSTRUCCIONES.md"]
   assert.match(instructions, /backend\/data\/provincias\.json/)
   assert.doesNotMatch(instructions, /src\/data\//)
-  // El catálogo nuevo se sirve desde backend/data: la guía trae la ruta GET.
-  assert.match(instructions, /app\.get\("\/api\/provincias"/)
-  assert.match(instructions, /readFileSync\(new URL\("\.\/data\/provincias\.json"/)
+  // El catálogo nuevo se importa desde el frontend: la guía no pide rutas.
+  assert.doesNotMatch(instructions, /app\.get\("\/api\/provincias"/)
+  assert.match(instructions, /No añadas ninguna ruta en `backend\/server\.js`/)
 
   const filename = "GestionTareas.vue"
   const parsed = parse(component, { filename })
@@ -838,7 +837,8 @@ test("las instrucciones incluyen el código y los enlaces de todas las APIs gene
   assert.match(instructions, /export async function getMedicamentos/)
   assert.match(instructions, /export async function obtenerLaboratorios/)
   assert.match(instructions, /app\.use\("\/api\/medicamentos", requireDatabase, MedicamentoRutas\)/)
-  assert.match(instructions, /app\.get\("\/api\/laboratorios"/)
+  assert.doesNotMatch(instructions, /app\.get\("\/api\/laboratorios"/)
+  assert.match(instructions, /import catalogo from "\.\.\/\.\.\/backend\/data\/laboratorios\.json"/)
   assert.match(instructions, /Copia las capas de API de catálogo/)
   assert.match(instructions, /backend\/data\/laboratorios\.json/)
   assert.doesNotMatch(instructions, /src\/data\/laboratorios\.json/)

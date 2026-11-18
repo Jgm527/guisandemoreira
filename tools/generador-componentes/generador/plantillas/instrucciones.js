@@ -45,10 +45,10 @@ function filePurpose(config, path) {
   if (path.startsWith("backend/data/")) {
     const name = path.slice("backend/data/".length, -".json".length)
     const catalog = collectCatalogs(config).find((entry) => entry.name === name)
-    return `Datos del catálogo \`${name}\` (${catalog?.count ?? "varios"} elementos): el backend los sirve en \`${catalogRoutePath(name)}\` y \`src/api/${name}.js\` los pide con Axios.`
+    return `Datos del catálogo \`${name}\` (${catalog?.count ?? "varios"} elementos): \`src/api/${name}.js\` importa este JSON directamente, sin ruta ni peticiones al backend.`
   }
   if (catalog) {
-    return `Módulo Axios del catálogo \`${catalog.name}\`: pide \`${catalogRoutePath(catalog.name)}\` y devuelve la lista que alimenta el \`<select>\`.`
+    return `Módulo de datos del catálogo \`${catalog.name}\`: importa \`backend/data/${catalog.name}.json\` y devuelve la lista que alimenta el \`<select>\`; no necesita ruta en el backend.`
   }
   return "Archivo generado."
 }
@@ -83,7 +83,7 @@ function generatedCode(config, files) {
       `src/api/${catalog.name}.js`,
       catalog.apiFunction
         ? `No se genera: el proyecto ya tiene \`src/api/${catalog.name}.js\` y el componente reutiliza \`${catalog.apiFunction}()\`.`
-        : `Capa Axios del catálogo \`${catalog.name}\`: pide \`${catalogRoutePath(catalog.name)}\` y devuelve la lista para el \`<select>\`. El backend lee ${fileLink(`backend/data/${catalog.name}.json`)}; el JSON no se importa desde el frontend.`,
+        : `Capa de datos del catálogo \`${catalog.name}\`: importa ${fileLink(`backend/data/${catalog.name}.json`)} directamente y devuelve la lista para el \`<select>\`; no pide nada al backend ni necesita una ruta nueva.`,
     )
   }
   add(
@@ -105,21 +105,19 @@ function catalogsSection(config) {
   const blocks = catalogs.map((catalog) => {
     const loadFunction = catalog.apiFunction || catalogApiFunctionName(catalog.name)
     const dataLine = catalog.source === "inline"
-      ? `- ${fileLink(`backend/data/${catalog.name}.json`)}: datos analizados y guardados por el generador (${catalog.count ?? "los"} elementos de la lista \`${catalog.rootKey || "(la raíz es una lista)"}\`). Cópialo a \`backend/data/\`: lo lee el backend, no el frontend.`
+      ? `- ${fileLink(`backend/data/${catalog.name}.json`)}: datos analizados y guardados por el generador (${catalog.count ?? "los"} elementos de la lista \`${catalog.rootKey || "(la raíz es una lista)"}\`). Cópialo a \`backend/data/\`: el módulo \`src/api/${catalog.name}.js\` lo importa desde ahí.`
       : `- \`backend/data/${catalog.name}.json\`: archivo que ya existe en el proyecto; no se copia ni se modifica.`
     const apiLine = catalog.apiFunction
       ? `- \`src/api/${catalog.name}.js\`: se reutiliza la función \`${loadFunction}()\` que ya existe; no se genera otro módulo. El componente la importa igual que las demás.`
-      : `- ${fileLink(`src/api/${catalog.name}.js`)}: módulo generado con \`${loadFunction}()\`, que pide \`${catalogRoutePath(catalog.name)}\` con Axios y devuelve la lista del catálogo. Su código está en la sección de código de los archivos generados.`
+      : `- ${fileLink(`src/api/${catalog.name}.js`)}: módulo generado con \`${loadFunction}()\`, que importa el JSON de \`backend/data/\` y devuelve la lista del catálogo. Su código está en la sección de código de los archivos generados.`
     const metadataLine = catalog.primitive
       ? "- La lista contiene valores simples: el `<select>` usa cada valor tal cual."
       : `- Campo visible: \`${catalog.labelField}\`; valor guardado en el formulario: \`${catalog.valueField}\`; identificador: ${catalog.idField ? `\`${catalog.idField}\`` : "no detectado"}.`
-    const route = catalog.routeExists
-      ? `La ruta \`${catalogRoutePath(catalog.name)}\` ya está registrada en \`backend/server.js\`; no la dupliques. Comprueba que siga leyendo \`backend/data/${catalog.name}.json\`.`
-      : `Registra esta ruta una sola vez en \`backend/server.js\`, junto a las de \`/api/municipios\` y \`/api/especialidades\` (importa \`fs\` si aún no está):\n\n${fence(`app.get("${catalogRoutePath(catalog.name)}", (req, res) => {
-  // La ruta se resuelve respecto a backend/server.js, no al directorio de arranque.
-  const datos = fs.readFileSync(new URL("./data/${catalog.name}.json", import.meta.url), "utf-8");
-  res.json(JSON.parse(datos));
-});`)}\n\nLa lectura con \`fs\` mantiene el catálogo disponible aunque MongoDB esté parado, igual que en las rutas de catálogo que ya tiene el proyecto. Si la ruta ya existiera con otro nombre de archivo, no añadas otra: comprueba la que hay.`
+    const route = catalog.source === "inline"
+      ? `No añadas ninguna ruta en \`backend/server.js\`: este catálogo se importa desde el frontend, así que no depende del backend ni de MongoDB. El JSON tiene que estar en \`backend/data/${catalog.name}.json\` porque el módulo lo importa desde esa ruta.`
+      : catalog.routeExists
+        ? `La ruta \`${catalogRoutePath(catalog.name)}\` ya está registrada en \`backend/server.js\`; no la dupliques. Comprueba que siga leyendo \`backend/data/${catalog.name}.json\`.`
+        : `Comprueba que \`backend/server.js\` tenga registrada la ruta \`${catalogRoutePath(catalog.name)}\`, que lee \`backend/data/${catalog.name}.json\`.`
     return `### Catálogo \`${catalog.name}\`
 
 ${dataLine}
@@ -132,7 +130,7 @@ ${route}`
 
   return `## Catálogos cargados desde archivo JSON
 
-Los campos de tipo **catálogo** no usan opciones fijas: cargan su lista de un JSON guardado en \`backend/data/\`. Los catálogos nuevos se generan en \`backend/data/<nombre>.json\` y \`src/api/<nombre>.js\` los pide a \`/api/<nombre>\` con Axios, así que la pantalla necesita el backend en marcha (no necesita MongoDB); los catálogos que ya existen en el proyecto se siguen pidiendo a su ruta \`/api/...\` (\`/api/especialidades\`, \`/api/municipios\`). El componente carga todo en \`cargarCatalogos()\`, que se ejecuta en \`onMounted()\`, y pinta un \`<select>\` con \`v-for\`.
+Los campos de tipo **catálogo** no usan opciones fijas: cargan su lista de un JSON guardado en \`backend/data/\`. Los catálogos nuevos se generan en \`backend/data/<nombre>.json\` y \`src/api/<nombre>.js\` importa ese JSON directamente (Vite lo incluye en el bundle), así que no necesitan ruta ni peticiones al backend; los catálogos que ya existen en el proyecto se siguen pidiendo a su ruta \`/api/...\` (\`/api/especialidades\`, \`/api/municipios\`). El componente carga todo en \`cargarCatalogos()\`, que se ejecuta en \`onMounted()\`, y pinta un \`<select>\` con \`v-for\`.
 
 ${blocks}
 
@@ -144,7 +142,7 @@ Si un campo catálogo declara \`parentField\`, el componente busca el registro d
 
 - Son catálogos de solo lectura: no se generan altas, ediciones ni borrados de opciones.
 - El backend guarda el valor elegido como texto (como \`espedoc\` en \`backend/modelos/Doctor.js\`) y no lo valida contra el JSON; añade esa comprobación en la ruta si la necesitas.
-- Los cambios en el JSON se ven al recargar la pantalla: no se genera caché, paginación ni búsqueda sobre el catálogo.
+- El JSON se importa al compilar: en desarrollo Vite recarga al cambiarlo y en producción hay que volver a compilar. No se genera caché, paginación ni búsqueda sobre el catálogo.
 
 `
 }
@@ -271,7 +269,7 @@ ${code ? `\n${code}\n` : ""}
 
 - No se genera backend nuevo, para no duplicar recursos reales.
 - Las relaciones con otras entidades y los stores de Pinia no se generan al reutilizar un recurso; complétalos a mano.
-- Los campos catálogo sí se generan: guardan su JSON en \`backend/data\` y lo sirven con una ruta GET que la guía explica, como el resto de catálogos del proyecto.
+- Los campos catálogo sí se generan: guardan su JSON en \`backend/data\` y \`src/api/<nombre>.js\` lo importa directamente, sin rutas nuevas en el backend.
 - Esta versión solo se apoya en recursos ya presentes en el repositorio y no inventa rutas ni colecciones.
 `
 }
@@ -303,16 +301,6 @@ export function generateInstructions(config, files = {}) {
     "",
     `app.use("${apiPath}", requireDatabase, ${singular}Rutas);`,
   ]
-  // Todo catálogo se sirve desde backend/data: si la ruta /api/<nombre> no está
-  // registrada todavía, la guía incluye el fragmento para añadirla.
-  const catalogsNeedingRoute = catalogs.filter((catalog) => !catalog.routeExists)
-  if (catalogsNeedingRoute.length) {
-    serverLines.push(
-      "",
-      `// Las rutas GET de los catálogos (${catalogsNeedingRoute.map((catalog) => `\`${catalogRoutePath(catalog.name)}\``).join(", ")}) están en la sección «Catálogos cargados desde archivo JSON»; van en este mismo archivo.`,
-    )
-  }
-
   const steps = []
   const step = (text) => `${steps.length + 1}. ${text}`
   if (has(modelPath)) steps.push(step(`Copia ${fileLink(modelPath)} a \`${modelPath}\`.`))
@@ -321,7 +309,7 @@ export function generateInstructions(config, files = {}) {
     steps.push(step(`Registra el router en \`backend/server.js\` con el bloque de «Integración de backend».`))
   }
   if (catalogData.length) {
-    steps.push(step(`Copia el JSON del catálogo a \`backend/data/\`: ${catalogData.map((catalog) => fileLink(`backend/data/${catalog.name}.json`)).join(", ")}.`))
+    steps.push(step(`Copia el JSON del catálogo a \`backend/data/\`: ${catalogData.map((catalog) => fileLink(`backend/data/${catalog.name}.json`)).join(", ")}. El módulo de API lo importa desde ahí, así que no hay que añadir ninguna ruta en \`backend/server.js\`.`))
   }
   if (generatedCatalogApis.length) {
     steps.push(step(`Copia las capas de API de catálogo: ${generatedCatalogApis.map((catalog) => fileLink(`src/api/${catalog.name}.js`)).join(", ")}.`))
@@ -329,9 +317,6 @@ export function generateInstructions(config, files = {}) {
   if (has(apiFile)) steps.push(step(`Copia ${fileLink(apiFile)} a \`${apiFile}\`.`))
   if (has(storePath)) steps.push(step(`Copia ${fileLink(storePath)} a \`${storePath}\`.`))
   steps.push(step(`Copia ${fileLink(componentPath)} a \`${componentPath}\`.`))
-  if (catalogsNeedingRoute.length) {
-    steps.push(step(`Añade en \`backend/server.js\` la ruta GET de los catálogos que aún no la tengan (sección de catálogos).`))
-  }
   steps.push(step(`Registra la pantalla en \`src/router/index.js\`` + (config.screen.menuLabel ? " y añade el enlace del menú." : ".")))
   steps.push(step("Reinicia backend y frontend y prueba las operaciones."))
 
@@ -384,7 +369,7 @@ ${catalogData.length ? `### Datos JSON de los catálogos
 
 ${catalogData.map((catalog) => `- ${fileLink(`backend/data/${catalog.name}.json`)} (${catalog.count ?? "varios"} elementos): cópialo a \`backend/data/${catalog.name}.json\` sin renombrar la lista \`${catalog.rootKey || "(raíz)"}\`.`).join("\n")}
 
-No se muestran aquí porque son datos, no código; ábrelos con el enlace y cópialos íntegros.
+No se muestran aquí porque son datos, no código; ábrelos con el enlace y cópialos íntegros. El módulo de API del catálogo los importa directamente: no hace falta ninguna ruta en el backend.
 ` : ""}
 ${catalogsSection(config)}## Comprobaciones manuales
 

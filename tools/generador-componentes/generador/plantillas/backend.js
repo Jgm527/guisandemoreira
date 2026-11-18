@@ -1,5 +1,5 @@
 import { RESOURCE_LIBRARY, js, singularPluralName, slugify } from "../datos.js"
-import { catalogApiFunctionName, catalogRoutePath, propertyAccess } from "../catalogos.js"
+import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
 
 function mongooseField(field) {
   const type = field.type === "number" ? "Number" : field.type === "boolean" ? "Boolean" : "String"
@@ -346,29 +346,25 @@ export function generateApi(config) {
   return lines.join("\n")
 }
 
-// Módulo de datos del catálogo JSON. El JSON se guarda en backend/data y lo
-// sirve una ruta GET de Express (la guía incluye el fragmento que hay que
-// registrar en server.js); el frontend solo lo pide con Axios, igual que el
-// resto de catálogos del proyecto. No depende de MongoDB.
+// Módulo de datos del catálogo JSON. El JSON se guarda en backend/data y este
+// módulo lo importa directamente: Vite lo incluye en el bundle, así que el
+// selector no necesita ninguna ruta nueva en el backend ni depende de que el
+// backend esté en marcha.
 export function generateCatalogApi(catalog) {
   const functionName = catalog.apiFunction || catalogApiFunctionName(catalog.name)
-  const list = catalog.rootKey ? propertyAccess("respuesta.data", catalog.rootKey) : "respuesta.data"
+  const list = catalog.rootKey ? propertyAccess("catalogo", catalog.rootKey) : "catalogo"
   return `// Dónde va: src/api/${catalog.name}.js
-// Qué es: la capa API del catálogo «${catalog.name}». Pide la lista a la ruta
-// ${catalogRoutePath(catalog.name)}, que lee backend/data/${catalog.name}.json y la devuelve
-// tal cual. El JSON se queda en el backend: este módulo no lo importa, así que
-// el catálogo se puede actualizar sin recompilar el frontend.
-import axios from "axios";
-
-// Misma dirección y puerto que el resto de módulos de src/api/.
-const API_URL = "http://localhost:3000${catalogRoutePath(catalog.name)}";
+// Qué es: la capa de datos del catálogo «${catalog.name}». Importa el JSON de
+// backend/data/${catalog.name}.json y devuelve la lista que llena el <select>.
+// No hay que registrar ninguna ruta en backend/server.js: Vite incluye el JSON
+// en el bundle y el catálogo se carga aunque el backend esté parado.
+import catalogo from "../../backend/data/${catalog.name}.json";
 
 // Devuelve la lista preparada para recorrerla con v-for en el componente.
 // Es async para que el componente la use igual que las demás API.
 export async function ${functionName}() {
-  // respuesta.data es el JSON de la ruta: la lista directamente o un objeto
-  // con la lista dentro (por ejemplo { "${catalog.name}": [...] }).
-  const respuesta = await axios.get(API_URL);
+  // El JSON puede ser la lista directamente o un objeto con la lista dentro
+  // (por ejemplo { "${catalog.name}": [...] }); aquí se devuelve solo la lista.
   return ${list};
 }
 `

@@ -121,10 +121,9 @@ Hay dos orígenes:
   de `municipios.json`).
 - **Datos nuevos**: se pega el JSON o se indica un archivo. El generador crea
   `backend/data/<nombre>.json`, igual que los catálogos del proyecto, y el
-  módulo Axios `src/api/<nombre>.js`, que pide la lista a `/api/<nombre>`. La
-  guía incluye la ruta GET que lee ese JSON y que hay que registrar una sola vez
-  en `backend/server.js`. El catálogo no depende de MongoDB, pero la pantalla
-  necesita el backend en marcha para cargarlo.
+  módulo `src/api/<nombre>.js`, que importa ese JSON directamente. Vite lo
+  incluye en el bundle, así que no hay que añadir ninguna ruta en
+  `backend/server.js` y el catálogo carga aunque el backend esté parado.
 
 El generador analiza la estructura antes de generar y propone la lista del JSON
 (`rootKey`), el campo visible (`labelField`, por ejemplo `nm`), el valor que se
@@ -133,9 +132,9 @@ por ejemplo `id`). Admite arrays en la raíz, objetos con varias listas y listas
 de valores simples. En la web el análisis ocurre al pulsar **Analizar
 estructura**; en la terminal, al indicar el archivo o pegar los datos, y todas
 las preguntas siguientes muestran las opciones detectadas. El nombre técnico
-del catálogo decide el archivo y la ruta: `especialidades` genera
-`backend/data/especialidades.json`, `src/api/especialidades.js` y la ruta
-`/api/especialidades`.
+del catálogo decide el archivo y el módulo: `especialidades` genera
+`backend/data/especialidades.json` y `src/api/especialidades.js`, que importa
+ese JSON (sin ruta nueva en el backend).
 
 El campo guarda el valor elegido como texto en Mongoose (igual que `espedoc` en
 `backend/modelos/Doctor.js`). Si un campo catálogo indica un `parentField`, el
