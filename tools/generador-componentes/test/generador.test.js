@@ -1,8 +1,13 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { PassThrough } from "node:stream"
 import { spawnSync } from "node:child_process"
 import { compileScript, compileTemplate, parse } from "@vue/compiler-sfc"
 import { generateFiles, validateConfiguration } from "../generador.js"
+import { runTerminal } from "../terminal.js"
 
 function validConfiguration() {
   return {
@@ -60,6 +65,100 @@ test("genera las piezas CRUD y una ruta de salida segura", () => {
   assert.match(generated.files["src/components/GestionTareas.vue"], /editingId\.value = guardado\._id/)
   assert.doesNotMatch(generated.files["src/components/GestionTareas.vue"], / limpiar\(\);/)
   assert.match(generated.files["INSTRUCCIONES.md"], /backend\/server\.js/)
+})
+
+test("el asistente de terminal genera archivos usando el mismo validador", async () => {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "generador-terminal-test-"))
+  const output = new PassThrough()
+  let transcript = ""
+  output.on("data", (chunk) => { transcript += chunk.toString() })
+  const answers = {
+    "Nombre visible de la pantalla": "Pruebas",
+    "Nombre técnico del componente (PascalCase)": "GestionPruebas",
+    "Ruta del navegador": "/pruebas",
+    "Texto del menú (opcional)": "",
+    "Nombre singular de la entidad (PascalCase)": "Prueba",
+    "Nombre plural / colección (minúsculas)": "pruebas",
+    "Nombre técnico": "nombre",
+    "Etiqueta visible": "Nombre",
+  }
+  const promptOverrides = {
+    ask: async (label, defaultValue = "") => answers[label] ?? defaultValue,
+    choose: async (label, choices, defaultValue) => {
+      if (label === "Tipo de dato") return "text"
+      return choices.some(({ value }) => value === defaultValue) ? defaultValue : choices[0].value
+    },
+    chooseMany: async (label, choices, defaultValues) => label.startsWith("Selecciona las operaciones")
+      ? ["list", "create"]
+      : defaultValues,
+    confirm: async (label, defaultValue = false) => label === "¿Generar estos archivos?" || defaultValue,
+    count: async (label, { defaultValue }) => defaultValue,
+  }
+  try {
+    const generated = await runTerminal({
+      output,
+      projectRoot: temporary,
+      outputRoot: path.join(temporary, "salidas"),
+      promptOverrides,
+    })
+    assert.equal(generated, true)
+    const outputFolders = await readdir(path.join(temporary, "salidas"))
+    assert.deepEqual(outputFolders, ["gestion-pruebas"], transcript)
+    const outputDirectory = path.join(temporary, "salidas", "gestion-pruebas")
+    const files = await readdir(outputDirectory)
+    assert.ok(files.includes("INSTRUCCIONES.md"))
+    assert.ok(files.includes("configuracion.json"))
+    assert.ok(files.includes("backend"))
+    assert.ok(files.includes("src"))
+    const config = JSON.parse(await readFile(path.join(outputDirectory, "configuracion.json"), "utf8"))
+    assert.equal(config.entity.apiPath, "/api/pruebas")
+    assert.deepEqual(config.operations, ["list", "create"])
+    assert.match(transcript, /Generación completada/)
+    assert.match(transcript, /INSTRUCCIONES\.md/)
+  } finally {
+    output.destroy()
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
+
+test("el asistente permite volver a una pregunta, editarla y conservar las respuestas posteriores", async () => {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "generador-terminal-navegacion-"))
+  const input = new PassThrough()
+  const output = new PassThrough()
+  let transcript = ""
+  output.on("data", (chunk) => { transcript += chunk.toString() })
+  const answers = [
+    ...new Array(21).fill(""),
+    ":atras",
+    ...new Array(10).fill(":atras"),
+    "Nombre actualizado",
+    "",
+  ]
+  let answerIndex = 0
+  output.on("data", (chunk) => {
+    if (chunk.toString().endsWith(": ")) {
+      input.write(`${answers[answerIndex++] ?? ""}\n`)
+    }
+  })
+  try {
+    const generated = await runTerminal({
+      input,
+      output,
+      projectRoot: temporary,
+      outputRoot: path.join(temporary, "salidas"),
+    })
+    assert.equal(generated, true, transcript)
+    const config = JSON.parse(await readFile(
+      path.join(temporary, "salidas", "gestion-tareas", "configuracion.json"),
+      "utf8"
+    ))
+    assert.equal(config.fields[0].label, "Nombre actualizado")
+    assert.match(transcript, /Generación completada/)
+  } finally {
+    input.destroy()
+    output.destroy()
+    await rm(temporary, { recursive: true, force: true })
+  }
 })
 
 test("mantiene sincronizados el router generado, su import y el prefijo REST", () => {

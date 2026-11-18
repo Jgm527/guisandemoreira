@@ -15,10 +15,32 @@ puerto local, define `COMPONENT_GENERATOR_PORT` antes de iniciar Node.
 El servidor escucha únicamente en `127.0.0.1`. Al terminar, vuelve a la terminal
 y pulsa `Ctrl+C`.
 
+Si prefieres configurar una pantalla sin abrir el navegador, inicia el mismo
+generador en modo terminal:
+
+```powershell
+node tools/generador-componentes/server.js --terminal
+```
+
+El asistente pregunta por la pantalla, entidad, campos y sus restricciones,
+operaciones, relaciones y Pinia; al final muestra un resumen y solicita
+confirmación antes de guardar. Pulsa Enter para aceptar los valores
+recomendados, escribe `-` para dejar vacío un campo opcional, `:q` para cancelar
+o usa `Ctrl+C`. Si necesitas corregir una respuesta, escribe `:atras` para
+volver a la pregunta anterior; después de editarla, el asistente conserva las
+respuestas siguientes que todavía sean compatibles. Escribe `:adelante` para
+recuperar la respuesta anterior de la pregunta actual. La validación, las
+plantillas, las comprobaciones de archivos y la carpeta de salida son las mismas
+que en la interfaz web. La guía generada queda en `INSTRUCCIONES.md` dentro de
+la carpeta de salida. El modo necesita una terminal interactiva.
+
 ## Estructura del generador
 
 - `server.js` gestiona HTTP, validaciones de las solicitudes y escritura segura
-  de las salidas; sirve únicamente los módulos públicos permitidos.
+  de las salidas; sirve únicamente los módulos públicos permitidos. Con
+  `--terminal`, inicia el asistente de consola en vez del servidor web.
+- `terminal.js` implementa el asistente interactivo y usa las mismas funciones
+  de validación y generación que la interfaz.
 - `generador.js` conserva la API de generación que usa el servidor y coordina
   validación y plantillas.
 - `generador/datos.js` centraliza los tipos, metadatos de recursos y utilidades

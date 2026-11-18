@@ -5,13 +5,23 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { generateFiles, validateConfiguration, relationRequiredFiles } from "./generador.js"
 
+if (process.argv.includes("--terminal")) {
+  if (!process.stdin.isTTY) {
+    console.error("El modo terminal necesita una consola interactiva. Ejecuta este comando desde PowerShell, CMD o la terminal de VS Code.")
+    process.exitCode = 1
+  } else {
+    const { runTerminal } = await import("./terminal.js")
+    await runTerminal()
+  }
+} else {
+// El modo terminal conserva el mismo generador, pero no inicia el servidor HTTP.
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.resolve(TOOL_ROOT, "..", "..")
 const OUTPUT_ROOT = path.resolve(TOOL_ROOT, "salidas")
 const HOST = "127.0.0.1"
 const PORT = Number(process.env.COMPONENT_GENERATOR_PORT || 4179)
 const MAX_BODY_BYTES = 1_000_000
-const PUBLIC_MODULES = new Set(["api.js", "ui.js"])
+const PUBLIC_MODULES = new Set(["api.js", "ui.js", "restricciones.js"])
 
 const RESOURCE_REFERENCES = [
   {
@@ -365,3 +375,4 @@ server.listen(PORT, HOST, () => {
   console.log(`Generador de componentes disponible en http://${HOST}:${PORT}`)
   console.log("El servidor escucha solo en este equipo; cierra el proceso con Ctrl+C al terminar.")
 })
+}

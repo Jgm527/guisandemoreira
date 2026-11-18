@@ -1,4 +1,5 @@
 import { postJson } from "./modules/api.js"
+import { TEXT_PATTERN_PRESETS } from "./modules/restricciones.js"
 import { createUi } from "./modules/ui.js"
 
 const form = document.querySelector("#generator-form")
@@ -15,16 +16,6 @@ const validationMessage = document.querySelector("#validation-message")
 const generateButton = document.querySelector("#generate-button")
 let currentStep = 0
 let currentPreview = null
-const PATTERN_PRESETS = {
-  none: { pattern: "", message: "" },
-  letters: { pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$", message: "usa solo letras" },
-  "letters-spaces": { pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$", message: "usa solo letras y espacios" },
-  digits: { pattern: "^\\d+$", message: "usa solo dígitos" },
-  alphanumeric: { pattern: "^[A-Za-z0-9]+$", message: "usa solo letras y números" },
-  uppercase: { pattern: "^[A-Z]+$", message: "usa solo letras mayúsculas" },
-  lowercase: { pattern: "^[a-z]+$", message: "usa solo letras minúsculas" },
-}
-
 const ui = createUi(formConfig)
 const {
   clearNotice,
@@ -77,9 +68,8 @@ function addField(field = {}) {
   const patternMessageControl = card.querySelector('[data-property="patternMessage"]')
   const patternPresetControl = card.querySelector("[data-pattern-preset]")
   const patternAdvanced = card.querySelector('[data-restriction="pattern-advanced"]')
-  const matchedPreset = Object.entries(PATTERN_PRESETS)
-    .find(([, preset]) => preset.pattern === patternControl.value)
-  patternPresetControl.value = matchedPreset ? matchedPreset[0] : patternControl.value ? "custom" : "none"
+  const matchedPreset = TEXT_PATTERN_PRESETS.find((preset) => preset.pattern === patternControl.value)
+  patternPresetControl.value = matchedPreset?.value ?? (patternControl.value ? "custom" : "none")
   let previousRangeKind = ["text", "textarea", "email", "phone"].includes(typeControl.value)
     ? "length"
     : typeControl.value === "number" || typeControl.value === "date" || typeControl.value === "time"
@@ -179,8 +169,8 @@ function addField(field = {}) {
 
   typeControl.addEventListener("change", updateFieldType)
   patternPresetControl.addEventListener("change", () => {
-    const preset = PATTERN_PRESETS[patternPresetControl.value]
-    if (preset) {
+    const preset = TEXT_PATTERN_PRESETS.find((item) => item.value === patternPresetControl.value)
+    if (preset && preset.value !== "custom") {
       patternControl.value = preset.pattern
       patternMessageControl.value = preset.message
     } else {
@@ -191,9 +181,8 @@ function addField(field = {}) {
     updateFieldType()
   })
   patternControl.addEventListener("input", () => {
-    const matched = Object.entries(PATTERN_PRESETS)
-      .find(([, preset]) => preset.pattern === patternControl.value)
-    patternPresetControl.value = matched ? matched[0] : patternControl.value ? "custom" : "none"
+    const matched = TEXT_PATTERN_PRESETS.find((preset) => preset.pattern === patternControl.value)
+    patternPresetControl.value = matched?.value ?? (patternControl.value ? "custom" : "none")
     updateFieldType()
   })
   card.querySelector('[data-property="label"]').addEventListener("input", updateFieldType)
