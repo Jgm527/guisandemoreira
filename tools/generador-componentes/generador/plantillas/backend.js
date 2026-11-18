@@ -1,5 +1,5 @@
 import { RESOURCE_LIBRARY, js, singularPluralName, slugify } from "../datos.js"
-import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
+import { catalogApiFunctionName, catalogRoutePath, propertyAccess } from "../catalogos.js"
 
 function mongooseField(field) {
   const type = field.type === "number" ? "Number" : field.type === "boolean" ? "Boolean" : "String"
@@ -346,24 +346,29 @@ export function generateApi(config) {
   return lines.join("\n")
 }
 
-// Módulo de datos del catálogo JSON. No hay modelo Mongoose ni ruta de Express:
-// el JSON se empaqueta con el frontend y se importa directamente, así que la
-// pantalla funciona en cuanto se copian los archivos, sin editar server.js ni
-// depender de que MongoDB esté conectado.
+// Módulo de datos del catálogo JSON. El JSON se guarda en backend/data y lo
+// sirve una ruta GET de Express (la guía incluye el fragmento que hay que
+// registrar en server.js); el frontend solo lo pide con Axios, igual que el
+// resto de catálogos del proyecto. No depende de MongoDB.
 export function generateCatalogApi(catalog) {
   const functionName = catalog.apiFunction || catalogApiFunctionName(catalog.name)
-  const list = catalog.rootKey ? propertyAccess("datos", catalog.rootKey) : "datos"
+  const list = catalog.rootKey ? propertyAccess("respuesta.data", catalog.rootKey) : "respuesta.data"
   return `// Dónde va: src/api/${catalog.name}.js
-// Qué es: el módulo de datos del catálogo «${catalog.name}». El JSON se copia a
-// src/data/${catalog.name}.json y viaja con el frontend: este módulo no hace
-// peticiones HTTP, no necesita una ruta en backend/server.js y funciona aunque
-// el backend o MongoDB estén parados. Devuelve la lista que alimenta el <select>.
-import datos from "../data/${catalog.name}.json";
+// Qué es: la capa API del catálogo «${catalog.name}». Pide la lista a la ruta
+// ${catalogRoutePath(catalog.name)}, que lee backend/data/${catalog.name}.json y la devuelve
+// tal cual. El JSON se queda en el backend: este módulo no lo importa, así que
+// el catálogo se puede actualizar sin recompilar el frontend.
+import axios from "axios";
+
+// Misma dirección y puerto que el resto de módulos de src/api/.
+const API_URL = "http://localhost:3000${catalogRoutePath(catalog.name)}";
 
 // Devuelve la lista preparada para recorrerla con v-for en el componente.
-// Es async para que el componente la use igual que las API que sí van por HTTP.
+// Es async para que el componente la use igual que las demás API.
 export async function ${functionName}() {
-  // El JSON puede venir envuelto en una clave (por ejemplo { "${catalog.name}": [...] }).
+  // respuesta.data es el JSON de la ruta: la lista directamente o un objeto
+  // con la lista dentro (por ejemplo { "${catalog.name}": [...] }).
+  const respuesta = await axios.get(API_URL);
   return ${list};
 }
 `

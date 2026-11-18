@@ -162,10 +162,11 @@ Orígenes admitidos:
   `src/api/<nombre>.js` exporta una función sin argumentos para esa lista, se
   reutiliza el módulo en lugar de duplicarlo.
 - **Datos nuevos**: JSON pegado en el formulario o leído de un archivo. Se
-  genera `src/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`, que
-  importa ese JSON y expone su función de carga. No se añade ni se registra
-  ninguna ruta en `backend/server.js`: el catálogo se empaqueta con el frontend
-  y no depende de MongoDB.
+  genera `backend/data/<nombre>.json`, en la misma carpeta que los catálogos del
+  proyecto, y el módulo Axios `src/api/<nombre>.js`, que pide la lista a
+  `/api/<nombre>`. La guía incluye la ruta GET que lee ese JSON y que hay que
+  registrar una sola vez en `backend/server.js`. El catálogo no depende de
+  MongoDB, pero la pantalla necesita el backend en marcha para cargarlo.
 
 El generador analiza la estructura de los datos para proponer la lista
 (`rootKey`), el campo visible (`labelField`), el valor que se guarda

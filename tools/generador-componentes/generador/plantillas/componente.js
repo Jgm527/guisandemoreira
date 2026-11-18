@@ -151,7 +151,8 @@ export function generateComponent(config) {
   ])
   const scriptImports = ["ref"]
   if (hasForm) scriptImports.push("reactive")
-  const needsComputed = apiRelations.length > 0 ||
+  const needsComputed = hasList ||
+    apiRelations.length > 0 ||
     piniaRelations.some((relation) => relation.required) ||
     dependentCatalogFields.length > 0
   if (needsComputed) scriptImports.push("computed")
@@ -244,6 +245,13 @@ export function generateComponent(config) {
     }
     componentTemplate.push(
       '    <p v-if="loading" class="py-4 text-gray-600" role="status">Cargando registros...</p>',
+      ...(listFields.length ? [
+        '    <!-- Buscador local: filtra la lista ya cargada por el texto de las columnas. -->',
+        '    <div v-if="!loading" class="mb-4">',
+        '      <label for="buscador-registros" class="sr-only">Buscar registros</label>',
+        '      <input id="buscador-registros" v-model.trim="busqueda" type="search" class="w-full rounded border border-gray-300 p-2" placeholder="Buscar en la tabla...">',
+        '    </div>',
+      ] : []),
       '    <div v-if="!loading" class="overflow-x-auto">',
       '      <table class="w-full border-collapse text-left">',
       '        <thead><tr class="border-b bg-gray-50">',
@@ -470,7 +478,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     }
     script.push(
       "// Carga los catálogos de los selectores; cada función viene de su módulo de",
-      "// src/api/ y su JSON vive en src/data (viaja con el frontend).",
+      "// src/api/ y su JSON vive en backend/data, servido por la ruta /api/.",
       "async function cargarCatalogos() {",
       ...formCatalogFields.flatMap((field) => {
         const loadFunction = field.catalog.apiFunction || catalogApiFunctionName(field.catalog.name)
@@ -494,10 +502,24 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     )
   }
   if (hasList) {
+    const searchableValues = listFields.length
+      ? listFields.map((field) => `registro.${field.name}`).join(", ")
+      : ""
     script.push(
       "",
-      "// registrosVisibles es la misma lista completa cargada desde MongoDB.",
-      "const registrosVisibles = registros;",
+      "// busqueda guarda el texto del buscador de la tabla.",
+      "const busqueda = ref(\"\");",
+      "",
+      "// registrosVisibles filtra la lista cargada: sin texto muestra todos los",
+      "// registros y, con texto, los que contienen esa cadena en alguna columna.",
+      "const registrosVisibles = computed(() => {",
+      "  const texto = busqueda.value.toLowerCase();",
+      "  if (!texto) return registros.value;",
+      searchableValues
+        ? `  return registros.value.filter((registro) => [${searchableValues}]`
+        : "  return registros.value.filter((registro) => Object.values(registro)",
+      '    .some((valor) => String(valor ?? "").toLowerCase().includes(texto)));',
+      "});",
       "",
       "// columnCount hace que la fila «No hay registros» ocupe el ancho de toda la tabla.",
       `const columnCount = ${listFields.length + listRelations.length + ((showActions || type === "Detalle") ? 1 : 0)};`,

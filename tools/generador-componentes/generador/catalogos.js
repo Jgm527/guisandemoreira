@@ -49,10 +49,10 @@ export function catalogNameFromFile(file) {
   return match ? match[1] : ""
 }
 
-// Los catálogos que ya existen en el proyecto viven en backend/data y se sirven
-// por HTTP; los datos nuevos se empaquetan con el frontend en src/data.
+// Todos los catálogos viven en backend/data: los que ya existen en el proyecto
+// y los que se generan con datos nuevos. El backend los sirve por HTTP en
+// /api/<nombre> y el frontend los pide con Axios desde src/api/.
 export const catalogDataFile = (name) => `backend/data/${name}.json`
-export const catalogFrontendDataFile = (name) => `src/data/${name}.json`
 export const catalogApiFile = (name) => `src/api/${name}.js`
 export const catalogRoutePath = (name) => `/api/${name}`
 export const catalogApiFunctionName = (name) => `obtener${pascalCase(name)}`

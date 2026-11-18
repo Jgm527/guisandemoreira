@@ -133,7 +133,14 @@ export async function enrichCatalogs(projectRoot, input) {
       : {}
     const source = String(original.source ?? "project").trim() || "project"
     if (source !== "project") {
-      fields.push(field)
+      // Un catálogo nuevo se guarda en backend/data y necesita su ruta GET igual
+      // que los del proyecto: se comprueba si ya está registrada para no pedir
+      // en la guía que se añada dos veces.
+      const name = String(original.name ?? "").trim()
+      const catalog = /^[a-z][a-z0-9]*$/.test(name)
+        ? { ...original, source: "inline", name, routeExists: await catalogRouteExists(projectRoot, name) }
+        : original
+      fields.push({ ...field, catalog })
       continue
     }
 

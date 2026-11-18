@@ -626,7 +626,7 @@ test("rechaza configuraciones de relación incoherentes", () => {
   assert.ok(result.errors.some((error) => error.includes("solo están disponibles para entidades nuevas")))
 })
 
-test("genera siempre la lista completa sin variables de búsqueda retiradas", () => {
+test("genera la lista completa con un buscador local de las columnas", () => {
   const config = validConfiguration()
   config.entity.singular = "Medicamento"
   config.entity.plural = "medicamentos"
@@ -642,7 +642,10 @@ test("genera siempre la lista completa sin variables de búsqueda retiradas", ()
 
   const generated = generateFiles(config)
   const component = generated.files["src/components/Medicamentos.vue"]
-  assert.match(component, /const registrosVisibles = registros;/)
+  assert.match(component, /const busqueda = ref\(""\);/)
+  assert.match(component, /const registrosVisibles = computed\(\(\) => \{/)
+  assert.match(component, /\[registro\.nombre\]/)
+  assert.match(component, /v-model\.trim="busqueda"/)
   assert.doesNotMatch(component, /searchTerm|config\.operations\.includes\("search"\)/)
   assert.match(generated.files["src/api/medicamentos.js"], /\/api\/medicamentos/)
   assert.match(generated.files["backend/rutas/medicamentos.rutas.js"], /Medicamento\.find\(\)\.lean\(\)/)
@@ -773,14 +776,15 @@ test("genera un catálogo nuevo desde los datos pegados y lo integra en el formu
   assert.equal(catalog.count, 2)
 
   const generated = generateFiles(config)
-  assert.ok(generated.files["src/data/provincias.json"])
-  assert.equal(generated.files["backend/data/provincias.json"], undefined)
+  // El JSON vive en backend/data, junto a los catálogos del proyecto.
+  assert.ok(generated.files["backend/data/provincias.json"])
+  assert.equal(generated.files["src/data/provincias.json"], undefined)
   assert.ok(generated.files["src/api/provincias.js"])
-  // El catálogo se importa del bundle: sin Axios y sin ruta que registrar en server.js.
-  assert.match(generated.files["src/api/provincias.js"], /import datos from "\.\.\/data\/provincias\.json"/)
-  assert.match(generated.files["src/api/provincias.js"], /return datos\.provincias/)
-  assert.doesNotMatch(generated.files["src/api/provincias.js"], /axios/)
-  assert.doesNotMatch(generated.files["src/api/provincias.js"], /http:\/\/localhost:3000/)
+  // El módulo pide la lista al backend con Axios; no importa el JSON.
+  assert.match(generated.files["src/api/provincias.js"], /const API_URL = "http:\/\/localhost:3000\/api\/provincias"/)
+  assert.match(generated.files["src/api/provincias.js"], /return respuesta\.data\.provincias/)
+  assert.match(generated.files["src/api/provincias.js"], /axios/)
+  assert.doesNotMatch(generated.files["src/api/provincias.js"], /import datos from/)
   assert.match(generated.files["src/components/GestionTareas.vue"], /catalogoProvincia\.value = await obtenerProvincias\(\)/)
   assert.match(generated.files["backend/modelos/Tarea.js"], /provincia: \{ type: String, required: true, trim: true \}/)
   const component = generated.files["src/components/GestionTareas.vue"]
@@ -789,10 +793,11 @@ test("genera un catálogo nuevo desde los datos pegados y lo integra en el formu
   assert.match(component, /:value="item\.nm"/)
   assert.match(component, /cargarCatalogos\(\)/)
   const instructions = generated.files["INSTRUCCIONES.md"]
-  assert.match(instructions, /src\/data\/provincias\.json/)
-  // Ningún catálogo nuevo obliga a editar backend/server.js ni a importar fs.
-  assert.doesNotMatch(instructions, /app\.get\("\/api\/provincias"/)
-  assert.doesNotMatch(instructions, /import fs from/)
+  assert.match(instructions, /backend\/data\/provincias\.json/)
+  assert.doesNotMatch(instructions, /src\/data\//)
+  // El catálogo nuevo se sirve desde backend/data: la guía trae la ruta GET.
+  assert.match(instructions, /app\.get\("\/api\/provincias"/)
+  assert.match(instructions, /readFileSync\(new URL\("\.\/data\/provincias\.json"/)
 
   const filename = "GestionTareas.vue"
   const parsed = parse(component, { filename })
@@ -833,11 +838,10 @@ test("las instrucciones incluyen el código y los enlaces de todas las APIs gene
   assert.match(instructions, /export async function getMedicamentos/)
   assert.match(instructions, /export async function obtenerLaboratorios/)
   assert.match(instructions, /app\.use\("\/api\/medicamentos", requireDatabase, MedicamentoRutas\)/)
-  assert.match(instructions, /No hay que registrar rutas en `backend\/server\.js`/)
-  assert.doesNotMatch(instructions, /app\.get\(/)
+  assert.match(instructions, /app\.get\("\/api\/laboratorios"/)
   assert.match(instructions, /Copia las capas de API de catálogo/)
-  assert.match(instructions, /src\/data\/laboratorios\.json/)
-  assert.doesNotMatch(instructions, /backend\/data\/laboratorios\.json/)
+  assert.match(instructions, /backend\/data\/laboratorios\.json/)
+  assert.doesNotMatch(instructions, /src\/data\/laboratorios\.json/)
   // El orden es explícito y las rutas del repositorio coinciden con las de salida.
   assert.match(instructions, /## Pasos\n\n1\. Copia/)
   assert.ok(instructions.indexOf("Copia las capas de API de catálogo") < instructions.indexOf("Copia [`src/components/Medicamentos.vue`]"))

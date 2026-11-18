@@ -333,7 +333,7 @@ async function askCatalog(prompts, output, projectRoot, previousFields) {
     parentField,
     apiFunction,
     primitive: analysis.primitive,
-    routeExists: source === "project" ? await catalogRouteExists(projectRoot, name) : false,
+    routeExists: await catalogRouteExists(projectRoot, name),
     data: source === "inline" ? `${JSON.stringify(analysis.parsed, null, 2)}\n` : "",
   }
 }

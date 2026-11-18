@@ -90,6 +90,8 @@ de forma independiente, si la pantalla comparte su propia selección con Pinia:
   la tabla; la guía explica cómo consumir el store desde otra pantalla.
 - Tras guardar, el formulario conserva los datos y pasa al modo edición del
   registro devuelto por la API; las etiquetas de acción usan una sola palabra.
+- Todas las tablas incluyen un buscador local que filtra las filas por el texto
+  de sus columnas, sin peticiones adicionales al backend.
 - Antes de generar, el servidor comprueba que los módulos de API y los stores
   que el componente va a importar existen de verdad; si falta alguno, se
   detiene y lo explica.
@@ -118,10 +120,11 @@ Hay dos orígenes:
   `obtenerEspecialidades()` o `obtenerProvincias()` para la lista `provincias`
   de `municipios.json`).
 - **Datos nuevos**: se pega el JSON o se indica un archivo. El generador crea
-  `src/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`, que importa el
-  JSON y devuelve la lista. No hay que registrar ninguna ruta en
-  `backend/server.js`: el catálogo viaja con el frontend y funciona aunque el
-  backend o MongoDB estén parados.
+  `backend/data/<nombre>.json`, igual que los catálogos del proyecto, y el
+  módulo Axios `src/api/<nombre>.js`, que pide la lista a `/api/<nombre>`. La
+  guía incluye la ruta GET que lee ese JSON y que hay que registrar una sola vez
+  en `backend/server.js`. El catálogo no depende de MongoDB, pero la pantalla
+  necesita el backend en marcha para cargarlo.
 
 El generador analiza la estructura antes de generar y propone la lista del JSON
 (`rootKey`), el campo visible (`labelField`, por ejemplo `nm`), el valor que se
@@ -129,7 +132,10 @@ guarda (`valueField`, por defecto el visible) y el identificador (`idField`,
 por ejemplo `id`). Admite arrays en la raíz, objetos con varias listas y listas
 de valores simples. En la web el análisis ocurre al pulsar **Analizar
 estructura**; en la terminal, al indicar el archivo o pegar los datos, y todas
-las preguntas siguientes muestran las opciones detectadas.
+las preguntas siguientes muestran las opciones detectadas. El nombre técnico
+del catálogo decide el archivo y la ruta: `especialidades` genera
+`backend/data/especialidades.json`, `src/api/especialidades.js` y la ruta
+`/api/especialidades`.
 
 El campo guarda el valor elegido como texto en Mongoose (igual que `espedoc` en
 `backend/modelos/Doctor.js`). Si un campo catálogo indica un `parentField`, el
