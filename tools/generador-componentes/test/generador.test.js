@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { spawnSync } from "node:child_process"
 import { compileScript, compileTemplate, parse } from "@vue/compiler-sfc"
 import { generateFiles, validateConfiguration } from "../generador.js"
 
@@ -59,6 +60,32 @@ test("genera las piezas CRUD y una ruta de salida segura", () => {
   assert.match(generated.files["src/components/GestionTareas.vue"], /editingId\.value = guardado\._id/)
   assert.doesNotMatch(generated.files["src/components/GestionTareas.vue"], / limpiar\(\);/)
   assert.match(generated.files["INSTRUCCIONES.md"], /backend\/server\.js/)
+})
+
+test("mantiene sincronizados el router generado, su import y el prefijo REST", () => {
+  const config = validConfiguration()
+  config.entity.singular = "Medicamento"
+  config.entity.plural = "medicamentos"
+  config.entity.apiPath = "/api/medicamentos"
+  config.fields[0].pattern = ""
+  config.fields[0].max = ""
+
+  const generated = generateFiles(config)
+  const routerPath = "backend/rutas/medicamentos.rutas.js"
+  assert.ok(generated.files[routerPath])
+  assert.ok(generated.files["src/api/medicamentos.js"])
+  assert.match(generated.files["INSTRUCCIONES.md"], /import MedicamentoRutas from "\.\/rutas\/medicamentos\.rutas\.js"/)
+  assert.match(generated.files["INSTRUCCIONES.md"], /app\.use\("\/api\/medicamentos", requireDatabase, MedicamentoRutas\)/)
+  assert.match(generated.files["src/api/medicamentos.js"], /http:\/\/localhost:3000\/api\/medicamentos/)
+
+  for (const [filename, source] of Object.entries(generated.files)) {
+    if (!filename.endsWith(".js")) continue
+    const checked = spawnSync(process.execPath, ["--check", "--input-type=module"], {
+      input: source,
+      encoding: "utf8",
+    })
+    assert.equal(checked.status, 0, `${filename}: ${checked.stderr}`)
+  }
 })
 
 test("mantiene centrados los campos de identificación y usa acciones breves con espaciado uniforme", () => {
@@ -207,6 +234,29 @@ test("recomienda límites tipados para número y fecha en vez de expresiones reg
   ]
   const { errors } = validateConfiguration(config)
   assert.ok(errors.some((error) => error.includes("usa las restricciones propias para número, fecha y hora")))
+})
+
+test("omite límites de fecha y hora que no se configuraron", () => {
+  const config = validConfiguration()
+  config.operations = ["list", "create", "edit", "delete"]
+  config.fields = [
+    { name: "fechaVacia", label: "Fecha sin límites", type: "date", form: true, list: true },
+    { name: "fechaDesde", label: "Fecha desde", type: "date", min: "2026-01-01", form: true, list: true },
+    { name: "fechaHasta", label: "Fecha hasta", type: "date", max: "2026-12-31", form: true, list: true },
+    { name: "horaDesde", label: "Hora desde", type: "time", min: "09:00", form: true, list: true },
+    { name: "horaHasta", label: "Hora hasta", type: "time", max: "17:00", form: true, list: true },
+  ]
+  const model = generateFiles(config).files["backend/modelos/Tarea.js"]
+  assert.doesNotMatch(model, /(?:<=|>=) null|null === null/)
+  assert.match(model, /fechaDesde:[\s\S]*?value >= "2026-01-01"/)
+  assert.match(model, /fechaHasta:[\s\S]*?value <= "2026-12-31"/)
+  assert.match(model, /horaDesde:[\s\S]*?value >= "09:00"/)
+  assert.match(model, /horaHasta:[\s\S]*?value <= "17:00"/)
+  const checked = spawnSync(process.execPath, ["--check", "--input-type=module"], {
+    input: model,
+    encoding: "utf8",
+  })
+  assert.equal(checked.status, 0, checked.stderr)
 })
 
 test("compila los formularios cuando solo se solicita crear o editar", () => {

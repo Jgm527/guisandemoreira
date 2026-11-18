@@ -123,12 +123,17 @@ El router incluye \`validarRelaciones()\`, que comprueba que los documentos rela
 ## Integración de backend
 
 1. Copia el modelo y el router a sus rutas del proyecto.
-2. En \`backend/server.js\`, importa el router y registra el prefijo:
+2. En \`backend/server.js\`, importa el router y registra el prefijo usando exactamente el nombre de archivo que aparece en «Archivos generados». No cambies entre singular y plural:
 
 \`\`\`js
 import ${singular}Rutas from "./rutas/${slugify(plural)}.rutas.js";
 app.use("${apiPath}", requireDatabase, ${singular}Rutas);
 \`\`\`
+
+El nombre del archivo del router y la ruta REST son independientes: copia el
+import de arriba literalmente y registra el prefijo \`${apiPath}\`. Si Node
+muestra \`ERR_MODULE_NOT_FOUND\`, comprueba que la ruta del import coincide
+carácter por carácter con el archivo copiado.
 
 ## Integración de frontend
 

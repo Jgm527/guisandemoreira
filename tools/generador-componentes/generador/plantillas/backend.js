@@ -20,24 +20,25 @@ function mongooseField(field) {
   } else {
     if (["text", "textarea", "email", "phone"].includes(field.type)) properties.push("trim: true")
     if (field.type === "date") {
-      const min = field.min === null ? "null" : js(field.min)
-      const max = field.max === null ? "null" : js(field.max)
+      const dateLimits = [
+        field.min === null ? "" : `&& value >= ${js(field.min)}`,
+        field.max === null ? "" : `&& value <= ${js(field.max)}`,
+      ].filter(Boolean).join("\n          ")
       validators.push(`{ validator: (value) => {
         if (value == null || value === "") return true;
         const date = new Date(\`\${value}T00:00:00.000Z\`);
         return /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
           && !Number.isNaN(date.getTime())
-          && date.toISOString().slice(0, 10) === value
-          && (${min} === null || value >= ${min})
-          && (${max} === null || value <= ${max});
+          && date.toISOString().slice(0, 10) === value${dateLimits ? `\n          ${dateLimits}` : ""};
       }, message: "La fecha no es válida o está fuera de los límites permitidos" }`)
     } else if (field.type === "time") {
-      const min = field.min === null ? "null" : js(field.min)
-      const max = field.max === null ? "null" : js(field.max)
+      const timeLimits = [
+        field.min === null ? "" : `&& value >= ${js(field.min)}`,
+        field.max === null ? "" : `&& value <= ${js(field.max)}`,
+      ].filter(Boolean).join("\n          ")
       validators.push(`{ validator: (value) => value == null || value === ""
         || (/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(value)
-          && (${min} === null || value >= ${min})
-          && (${max} === null || value <= ${max})), message: "La hora no es válida o está fuera de los límites permitidos" }`)
+          ${timeLimits ? `\n          ${timeLimits}` : ""}), message: "La hora no es válida o está fuera de los límites permitidos" }`)
     }
     if (field.min !== null && ["text", "textarea", "email", "phone"].includes(field.type)) {
       if (field.required) properties.push(`minlength: ${Number(field.min)}`)
