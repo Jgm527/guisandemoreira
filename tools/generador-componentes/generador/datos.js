@@ -9,6 +9,7 @@ export const FIELD_TYPES = new Set([
   "boolean",
   "radio",
   "select",
+  "catalog",
 ])
 
 // Recursos reales del proyecto que la herramienta puede reutilizar. Cada entrada

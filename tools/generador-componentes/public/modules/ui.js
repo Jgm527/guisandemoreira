@@ -35,6 +35,7 @@ export function createUi(getConfiguration) {
   function renderPreview(preview) {
     previewSummary.replaceChildren()
     const config = getConfiguration()
+    const catalogFields = (config.fields ?? []).filter((field) => field.type === "catalog")
     const summaryItems = [
       ["Pantalla", `${config.screen.title} → ${config.screen.component}.vue`],
       ["Ruta de navegador", config.screen.route],
@@ -45,6 +46,9 @@ export function createUi(getConfiguration) {
       ["Ruta REST", config.source === "existing"
         ? `${config.entity.apiPath} (API ya existente, no se toca)`
         : (config.entity.apiPath || "Se reutiliza la API existente")],
+      ["Catálogos", catalogFields.length
+        ? catalogFields.map((field) => `${field.name} ← ${field.catalog?.name || "catálogo sin analizar"}`).join(", ")
+        : "Ninguno"],
       ["Carpeta que se escribirá", preview.outputPath],
     ]
     for (const [label, value] of summaryItems) {
@@ -146,7 +150,7 @@ export function createUi(getConfiguration) {
       }
       notice.append(lead, list)
       const limitation = document.createElement("p")
-      limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (DNI para pacientes, referencias ObjectId/ref para doctores y citas, y stores de Pinia) están disponibles en el paso 4 para entidades nuevas; los catálogos para selectores y el PDF siguen pendientes."
+      limitation.textContent = "La reutilización genera solo la pantalla del recurso elegido: llama a la API real del proyecto y usa su identificador (por ejemplo, dnipac en pacientes). El backend no se duplica ni se modifica. Las pantallas Relacionadas (DNI para pacientes, referencias ObjectId/ref para doctores y citas, y stores de Pinia) están disponibles en el paso 4 para entidades nuevas. Los campos catálogo cargan su lista de un JSON de backend/data, con análisis automático de la estructura; el PDF sigue pendiente."
       notice.append(limitation)
       if (status.outputs.length) {
         const outputs = document.createElement("p")

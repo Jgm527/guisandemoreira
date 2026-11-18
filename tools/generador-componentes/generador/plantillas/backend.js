@@ -1,4 +1,5 @@
 import { RESOURCE_LIBRARY, js, singularPluralName, slugify } from "../datos.js"
+import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
 
 function mongooseField(field) {
   const type = field.type === "number" ? "Number" : field.type === "boolean" ? "Boolean" : "String"
@@ -18,7 +19,10 @@ function mongooseField(field) {
       }, message: "El número no respeta el incremento permitido" }`)
     }
   } else {
-    if (["text", "textarea", "email", "phone"].includes(field.type)) properties.push("trim: true")
+    // Los catálogos guardan el valor elegido como texto, igual que espedoc en
+    // backend/modelos/Doctor.js; no se validan contra la lista para que el JSON
+    // pueda actualizarse sin tocar el esquema.
+    if (["text", "textarea", "email", "phone", "catalog"].includes(field.type)) properties.push("trim: true")
     if (field.type === "date") {
       const dateLimits = [
         field.min === null ? "" : `&& value >= ${js(field.min)}`,
@@ -340,4 +344,27 @@ export function generateApi(config) {
     )
   }
   return lines.join("\n")
+}
+
+// Módulo de API del catálogo JSON. No hay modelo Mongoose: el backend sirve el
+// archivo de backend/data y esta capa devuelve la lista para el <select>.
+export function generateCatalogApi(catalog) {
+  const functionName = catalog.apiFunction || catalogApiFunctionName(catalog.name)
+  const list = catalog.rootKey ? propertyAccess("respuesta.data", catalog.rootKey) : "respuesta.data"
+  return `// Dónde va: src/api/${catalog.name}.js
+// Qué es: la capa API del catálogo «${catalog.name}». Lee el JSON estático que el
+// backend sirve en /api/${catalog.name} (mismo patrón que src/api/especialidades.js
+// y src/api/municipios.js) y devuelve la lista que alimenta el <select>.
+import axios from "axios";
+
+// Endpoint del catálogo: backend/server.js lee backend/data/${catalog.name}.json y lo devuelve entero.
+const URL = "http://localhost:3000/api/${catalog.name}";
+
+// Devuelve la lista preparada para recorrerla con v-for en el componente.
+export async function ${functionName}() {
+  const respuesta = await axios.get(URL);
+  // El JSON puede venir envuelto en una clave (por ejemplo { "especialidades": [...] }).
+  return ${list};
+}
+`
 }

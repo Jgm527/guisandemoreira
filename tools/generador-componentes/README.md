@@ -94,17 +94,50 @@ de forma independiente, si la pantalla comparte su propia selección con Pinia:
   que el componente va a importar existen de verdad; si falta alguno, se
   detiene y lo explica.
 
-Las relaciones con entidades generadas en ejecuciones anteriores, los
-selectores dependientes (provincia → municipio) y el `watch` sobre los stores
-siguen pendientes y la guía lo indica.
+Las relaciones con entidades generadas en ejecuciones anteriores y el `watch`
+sobre los stores siguen pendientes y la guía lo indica.
 
 Las confirmaciones, los errores y los mensajes de éxito del componente usan
 `src/utils/alertas.js` (SweetAlert2), la utilidad compartida del proyecto, en
 lugar de `window.confirm` o banners propios.
 
-Los catálogos para selectores de opciones fijas y la exportación a PDF todavía
-no están disponibles; los campos tipo selector y radio usan opciones que se
-escriben en el formulario.
+La exportación a PDF todavía no está disponible.
+
+## Catálogos desde archivo JSON
+
+Además del selector y el radio con opciones escritas en el formulario, un campo
+puede ser de tipo **catálogo**: su lista de opciones sale de un archivo JSON,
+como la especialidad de los doctores (`backend/data/especialidades.json`) o los
+municipios (`backend/data/municipios.json`).
+
+Hay dos orígenes:
+
+- **Proyecto**: se elige un JSON que ya existe en `backend/data`. Se reutiliza la
+  ruta `/api/<nombre>` y, si `src/api/<nombre>.js` exporta una función sin
+  argumentos que carga justo esa lista, se reutiliza también (por ejemplo
+  `obtenerEspecialidades()` o `obtenerProvincias()` para la lista `provincias`
+  de `municipios.json`).
+- **Datos nuevos**: se pega el JSON o se indica un archivo. El generador crea
+  `backend/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>`.
+
+El generador analiza la estructura antes de generar y propone la lista del JSON
+(`rootKey`), el campo visible (`labelField`, por ejemplo `nm`), el valor que se
+guarda (`valueField`, por defecto el visible) y el identificador (`idField`,
+por ejemplo `id`). Admite arrays en la raíz, objetos con varias listas y listas
+de valores simples. En la web el análisis ocurre al pulsar **Analizar
+estructura**; en la terminal, al indicar el archivo o pegar los datos, y todas
+las preguntas siguientes muestran las opciones detectadas.
+
+El campo guarda el valor elegido como texto en Mongoose (igual que `espedoc` en
+`backend/modelos/Doctor.js`). Si un campo catálogo indica un `parentField`, el
+componente filtra su lista por el valor elegido en ese otro catálogo y vacía la
+selección al cambiar el padre (patrón provincia → municipio de
+`XestionPacientes.vue`).
+
+Límites: el catálogo es de solo lectura (no se generan altas ni borrados de
+opciones), el filtro dependiente compara el identificador del hijo por prefijo
+con el del padre, no se valida en el backend que el valor enviado exista en el
+JSON y la lista se carga completa (sin paginación ni búsqueda).
 
 Las operaciones y campos se configuran en el formulario. La generación se
 detiene si hay errores de validación o coincidencias con los archivos del

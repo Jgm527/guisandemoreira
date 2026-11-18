@@ -150,13 +150,37 @@ tengan los mismos endpoints o identificadores.
 
 ### 6.3 Fuentes locales o catálogos
 
-Los selectores podrán usar opciones fijas definidas en la configuración o
-reutilizar catálogos que ya ofrece el proyecto. Por ejemplo, especialidades y
-municipios pueden consumirse desde sus módulos de API.
+Los campos de tipo **catálogo** cargan sus opciones de un archivo JSON, como las
+especialidades de los doctores (`backend/data/especialidades.json`) o los
+municipios (`backend/data/municipios.json`). Es un tipo de campo, no un tipo de
+pantalla, y no sustituye a las opciones fijas del selector ni del radio.
 
-En la primera versión, esto se refiere a opciones/listas para seleccionar; no
-implica crear un nuevo sistema genérico de almacenamiento local ni un nuevo
-backend para catálogos.
+Orígenes admitidos:
+
+- **Proyecto**: un JSON que ya existe en `backend/data`. Se reutiliza la ruta
+  `/api/<nombre>` registrada en `backend/server.js` y, cuando
+  `src/api/<nombre>.js` exporta una función sin argumentos para esa lista, se
+  reutiliza el módulo en lugar de duplicarlo.
+- **Datos nuevos**: JSON pegado en el formulario o leído de un archivo. Se
+  genera `backend/data/<nombre>.json` y el módulo `src/api/<nombre>.<ext>` con
+  su función de carga, y la guía indica la ruta que hay que registrar.
+
+El generador analiza la estructura de los datos para proponer la lista
+(`rootKey`), el campo visible (`labelField`), el valor que se guarda
+(`valueField`, por defecto el visible) y el identificador (`idField`). Admite
+arrays en la raíz, objetos con varias listas y listas de valores simples. El
+valor elegido se guarda como texto en Mongoose, igual que `espedoc` en
+`backend/modelos/Doctor.js`.
+
+Un campo catálogo puede declarar un `parentField` para filtrarse por otro campo
+catálogo del formulario (provincia → municipio). El componente busca el
+registro padre por su valor guardado, filtra el hijo con `startsWith` sobre los
+identificadores y vacía la selección dependiente al cambiar el padre.
+
+Límites: solo lectura (no se generan altas ni borrados de opciones), el filtro
+dependiente necesita identificadores que compartan prefijo, no se valida en el
+backend que el valor enviado exista en el JSON y la lista se carga completa, sin
+paginación ni búsqueda.
 
 ## 7. Preguntas del formulario
 
@@ -312,8 +336,9 @@ pantallas CRUD, Relacionado o Formulario, con estas limitaciones declaradas:
   `doctorStore`); no se generan stores de entidades relacionadas.
 - El store propio se genera para la entidad de la pantalla, no para las
   relacionadas.
-- No se generan relaciones con entidades creadas en ejecuciones anteriores,
-  selectores dependientes ni `watch` sobre los stores.
+- No se generan relaciones con entidades creadas en ejecuciones anteriores ni
+  `watch` sobre los stores. Los selectores dependientes sí se generan, pero solo
+  entre campos de tipo catálogo (ver 6.3).
 
 ### Paso 6: operaciones y funciones opcionales
 

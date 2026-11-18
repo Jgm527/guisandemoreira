@@ -15,6 +15,19 @@ export async function postJson(endpoint, data) {
   return result
 }
 
+// Pide al servidor local que analice la estructura de un catálogo: un archivo
+// real de backend/data ({ file }) o los datos pegados en el formulario ({ name, data }).
+export async function postCatalogAnalysis(payload) {
+  const response = await fetch("/api/catalog", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  const result = await response.json()
+  if (!response.ok) throw new Error(result.message || "No se pudo analizar el catálogo.")
+  return result
+}
+
 export async function getProjectStatus() {
   const response = await fetch("/api/status")
   if (!response.ok) throw new Error(`El servidor respondió con HTTP ${response.status}.`)

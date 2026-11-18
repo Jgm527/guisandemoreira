@@ -1,10 +1,18 @@
 import { randomUUID } from "node:crypto"
-import { access, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { access, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { publishGeneratedDirectory, renameWithRetry } from "./generador/archivos.js"
 import readline from "node:readline/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { generateFiles, relationRequiredFiles, validateConfiguration } from "./generador.js"
+import { catalogRequiredFiles, generateFiles, relationRequiredFiles, validateConfiguration } from "./generador.js"
 import { RESOURCE_LIBRARY } from "./generador/datos.js"
+import { analyzeCatalog, catalogDataFile, catalogNameFromFile } from "./generador/catalogos.js"
+import {
+  catalogRouteExists,
+  describeCatalogApi,
+  enrichCatalogs,
+  listProjectCatalogFiles,
+} from "./generador/catalogos-proyecto.js"
 import { TEXT_PATTERN_PRESETS } from "./public/modules/restricciones.js"
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
@@ -28,6 +36,7 @@ const FIELD_TYPES = [
   { value: "boolean", label: "Booleano / casilla" },
   { value: "radio", label: "Radio" },
   { value: "select", label: "Selector fijo" },
+  { value: "catalog", label: "Catálogo desde archivo JSON" },
 ]
 const OPERATIONS = [
   { value: "list", label: "Listar" },
@@ -155,12 +164,165 @@ function createPrompts(rl, output, navigation) {
   return { ask, choose, chooseMany, confirm, count }
 }
 
-async function askField(index, prompts, output, defaults = {}) {
+async function readCatalogFile(projectRoot, file) {
+  const absolute = path.resolve(projectRoot, file)
+  const relative = path.relative(projectRoot, absolute)
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("El archivo debe estar dentro del proyecto.")
+  }
+  return readFile(absolute, "utf8")
+}
+
+// Asistente del campo catálogo: elige el archivo JSON, analiza su estructura y
+// deja que se confirme la lista y los campos detectados. Es el mismo análisis
+// que usa la interfaz web antes de generar.
+async function askCatalog(prompts, output, projectRoot, previousFields) {
+  const { ask, choose } = prompts
+  const available = await listProjectCatalogFiles(projectRoot)
+  let source = "inline"
+  if (available.length) {
+    source = await choose("Origen del catálogo", [
+      { value: "project", label: "Archivo JSON que ya existe en backend/data" },
+      { value: "inline", label: "Un archivo JSON nuevo que se copiará a backend/data" },
+    ], "project")
+  } else {
+    writeLine(output, "No se encontraron archivos JSON en backend/data: se pedirá un archivo nuevo.")
+  }
+
+  let name = ""
+  let file = ""
+  if (source === "project") {
+    file = await choose(
+      "Archivo de datos del catálogo",
+      available.map((item) => ({ value: item.file, label: `${item.file} (${item.name})` })),
+      available[0].file,
+    )
+    name = catalogNameFromFile(file)
+  } else {
+    name = await ask("Nombre técnico del catálogo (se guardará en backend/data/<nombre>.json)", "catalogo")
+  }
+
+  let rawText = ""
+  let analysis = null
+  if (source === "project") {
+    rawText = await readCatalogFile(projectRoot, file)
+    analysis = analyzeCatalog(rawText, { name, file })
+    if (!analysis.ok) throw new Error(analysis.error)
+  } else {
+    while (!analysis) {
+      const filePath = await ask(
+        "Ruta del archivo JSON de origen (relativa a la raíz del proyecto)",
+        catalogDataFile(name),
+      )
+      try {
+        rawText = await readCatalogFile(projectRoot, filePath)
+        const result = analyzeCatalog(rawText, { name })
+        if (!result.ok) {
+          writeLine(output, `No se pudo analizar: ${result.error}`)
+          continue
+        }
+        analysis = result
+      } catch (error) {
+        writeLine(output, `No se pudo leer ${filePath}: ${error.message}`)
+      }
+    }
+  }
+
+  let rootKey = analysis.rootKey
+  if (analysis.arrays.length > 1) {
+    rootKey = await choose(
+      "Lista del JSON que alimentará el selector",
+      analysis.arrays.map((array) => ({
+        value: array.key,
+        label: `${array.key || "(la raíz es una lista)"} — ${array.count} elementos`,
+      })),
+      analysis.rootKey,
+    )
+    if (rootKey !== analysis.rootKey) {
+      const reanalyzed = analyzeCatalog(rawText, { name, rootKey })
+      if (!reanalyzed.ok) throw new Error(reanalyzed.error)
+      analysis = reanalyzed
+    }
+  }
+
+  writeLine(
+    output,
+    `Detectado: lista «${analysis.rootKey || "la raíz"}» con ${analysis.count} elementos` +
+      (analysis.primitive ? ", todos valores simples." : `, campos: ${analysis.fields.join(", ")}.`),
+  )
+
+  let labelField = ""
+  let valueField = ""
+  let idField = ""
+  if (!analysis.primitive) {
+    const fieldChoices = analysis.fields.map((fieldName) => ({ value: fieldName, label: fieldName }))
+    labelField = await choose("Campo visible del catálogo", fieldChoices, analysis.labelField || analysis.fields[0])
+    valueField = await choose("Campo que se guardará en el formulario", fieldChoices, analysis.valueField || labelField)
+    idField = await choose(
+      "Campo identificador (permite filtrar por otro selector)",
+      [{ value: "", label: "Sin identificador" }, ...fieldChoices],
+      analysis.idField || "",
+    )
+  }
+
+  const api = await describeCatalogApi(projectRoot, name)
+  let apiFunction = ""
+  if (api.exists) {
+    const reusable = api.functions.filter((entry) => entry.params === 0)
+    if (reusable.length) {
+      const preferred = reusable.find((entry) => entry.name === api.suggestedFunction)?.name ?? reusable[0].name
+      apiFunction = await choose(
+        `Función de ${api.file} que carga el catálogo`,
+        reusable.map((entry) => ({ value: entry.name, label: `${entry.name}()` })),
+        preferred,
+      )
+    } else {
+      writeLine(
+        output,
+        `Aviso: ${api.file} ya existe pero no exporta funciones sin argumentos. Usa otro nombre de catálogo para no duplicar el módulo.`,
+      )
+    }
+  }
+
+  let parentField = ""
+  const parentCandidates = previousFields.filter((field) =>
+    field.type === "catalog" && field.catalog && field.catalog.idField && !field.catalog.primitive)
+  if (idField && parentCandidates.length) {
+    parentField = await choose(
+      "¿Filtrar este catálogo por otro selector del formulario?",
+      [
+        { value: "", label: "No: mostrar el catálogo completo" },
+        ...parentCandidates.map((field) => ({ value: field.name, label: `${field.label} (${field.name})` })),
+      ],
+      "",
+    )
+  }
+
+  return {
+    source,
+    name,
+    file: source === "project" ? file : "",
+    rootKey: analysis.rootKey,
+    idField,
+    labelField,
+    valueField,
+    parentField,
+    apiFunction,
+    primitive: analysis.primitive,
+    routeExists: source === "project" ? await catalogRouteExists(projectRoot, name) : false,
+    data: source === "inline" ? `${JSON.stringify(analysis.parsed, null, 2)}\n` : "",
+  }
+}
+
+async function askField(index, prompts, output, defaults = {}, context = {}) {
   const { ask, choose, confirm } = prompts
   writeLine(output, `\n--- Campo ${index + 1} ---`)
   const name = await ask("Nombre técnico", defaults.name ?? (index === 0 ? "titulo" : ""))
   const label = await ask("Etiqueta visible", defaults.label ?? (index === 0 ? "Título" : ""))
   const type = await choose("Tipo de dato", FIELD_TYPES, defaults.type ?? "text")
+  const catalog = type === "catalog"
+    ? await askCatalog(prompts, output, context.projectRoot ?? DEFAULT_PROJECT_ROOT, context.fields ?? [])
+    : null
   const required = await confirm("¿Es obligatorio?", defaults.required ?? false)
   const defaultValue = await ask("Valor inicial (deja vacío si no tiene)", defaults.defaultValue ?? "", { optional: true })
   let min = ""
@@ -222,6 +384,7 @@ async function askField(index, prompts, output, defaults = {}) {
     form,
     list,
     search: false,
+    ...(catalog ? { catalog } : {}),
   }
 }
 
@@ -244,7 +407,7 @@ async function askRelation(index, prompts, output) {
   return { resource, fieldName, label, selection, required }
 }
 
-async function collectConfiguration(prompts, output) {
+async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJECT_ROOT) {
   const { ask, choose, chooseMany, confirm, count } = prompts
   writeLine(output, "\n=== 1. Pantalla ===")
   let screenType = await choose("Tipo de pantalla", SCREEN_TYPES, "CRUD")
@@ -296,7 +459,7 @@ async function collectConfiguration(prompts, output) {
   })
   const fields = []
   for (let index = 0; index < fieldCount; index += 1) {
-    fields.push(await askField(index, prompts, output))
+    fields.push(await askField(index, prompts, output, {}, { projectRoot, fields: [...fields] }))
   }
 
   const supportedOperations = source === "existing"
@@ -350,6 +513,8 @@ async function checkProjectRequirements(config, projectRoot) {
     ? [...(RESOURCE_LIBRARY[config.existingResource]?.referenceFiles ?? [])]
     : []
   requiredFiles.push(...relationRequiredFiles(config))
+  // Módulos de catálogo reutilizados: el componente los importa tal cual.
+  requiredFiles.push(...catalogRequiredFiles(config))
   const missing = []
   for (const relativePath of new Set(requiredFiles)) {
     try {
@@ -451,17 +616,17 @@ async function writeGeneratedFiles(files, outputSlug, outputRoot, prompts, outpu
       await writeFile(destination, contents, { encoding: "utf8", flag: "wx" })
     }
     if (exists) {
-      await rename(target, backup)
+      await renameWithRetry(target, backup)
       movedExisting = true
     }
-    await rename(temporary, target)
+    await publishGeneratedDirectory(temporary, target)
     if (movedExisting) await rm(backup, { recursive: true, force: false })
     return true
   } catch (error) {
     await rm(temporary, { recursive: true, force: true })
     if (movedExisting) {
       try {
-        await rename(backup, target)
+        await renameWithRetry(backup, target)
       } catch (restoreError) {
         throw new Error(`No se pudo completar la generación (${error.message}) ni restaurar la salida anterior (${backup}): ${restoreError.message}`, { cause: restoreError })
       }
@@ -496,15 +661,19 @@ export async function runTerminal({
         navigation.suppressOutput = navigation.history.length > 0 && navigation.target < navigation.history.length
         let config
         while (true) {
-          const inputConfig = await collectConfiguration(prompts, wizardOutput)
+          const inputConfig = await collectConfiguration(prompts, wizardOutput, projectRoot)
           navigation.configEnd = navigation.index
-          const result = validateConfiguration(inputConfig)
-          if (!result.errors.length) {
+          // Los catálogos se completan con la estructura real de sus archivos,
+          // igual que hace el servidor web antes de validar.
+          const { input: enriched, errors: catalogErrors } = await enrichCatalogs(projectRoot, inputConfig)
+          const result = validateConfiguration(enriched)
+          const validationErrors = [...catalogErrors, ...result.errors]
+          if (!validationErrors.length) {
             config = result.config
             break
           }
           writeLine(output, "\nHay que corregir estos datos antes de generar:")
-          result.errors.forEach((error) => writeLine(output, `  - ${error}`))
+          validationErrors.forEach((error) => writeLine(output, `  - ${error}`))
           const retry = await prompts.confirm("¿Volver a empezar el asistente?", true)
           if (!retry) {
             writeLine(output, "Generación cancelada.")

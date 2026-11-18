@@ -1,4 +1,4 @@
-import { postJson } from "./modules/api.js"
+import { getProjectStatus, postCatalogAnalysis, postJson } from "./modules/api.js"
 import { TEXT_PATTERN_PRESETS } from "./modules/restricciones.js"
 import { createUi } from "./modules/ui.js"
 
@@ -34,6 +34,22 @@ const RELATION_RESOURCE_INFO = {
   citas: { label: "Citas", hasStore: false },
 }
 
+// Los controles del panel de catálogo se envían anidados en field.catalog, que
+// es lo que valida y consume el generador. El archivo elegido se añade aparte
+// porque su <select> se rellena con los JSON reales de backend/data.
+const CATALOG_PROPERTIES = {
+  catalogSource: "source",
+  catalogName: "name",
+  catalogData: "data",
+  catalogRootKey: "rootKey",
+  catalogLabelField: "labelField",
+  catalogValueField: "valueField",
+  catalogIdField: "idField",
+  catalogParentField: "parentField",
+  catalogApiFunction: "apiFunction",
+}
+let projectCatalogs = []
+
 function showStep(index) {
   currentStep = index
   for (const [panelIndex, panel] of panels.entries()) {
@@ -68,6 +84,13 @@ function addField(field = {}) {
   const patternMessageControl = card.querySelector('[data-property="patternMessage"]')
   const patternPresetControl = card.querySelector("[data-pattern-preset]")
   const patternAdvanced = card.querySelector('[data-restriction="pattern-advanced"]')
+  const catalogPanel = card.querySelector("[data-catalog-panel]")
+  const catalogMeta = card.querySelector("[data-catalog-meta]")
+  const catalogSourceControl = card.querySelector('[data-property="catalogSource"]')
+  const catalogFileControl = card.querySelector("[data-catalog-file]")
+  const catalogNameControl = card.querySelector('[data-property="catalogName"]')
+  const catalogDataControl = card.querySelector('[data-property="catalogData"]')
+  const catalogRootKeyControl = card.querySelector('[data-property="catalogRootKey"]')
   const matchedPreset = TEXT_PATTERN_PRESETS.find((preset) => preset.pattern === patternControl.value)
   patternPresetControl.value = matchedPreset?.value ?? (patternControl.value ? "custom" : "none")
   let previousRangeKind = ["text", "textarea", "email", "phone"].includes(typeControl.value)
@@ -165,9 +188,29 @@ function addField(field = {}) {
     card.querySelector('[data-hint-for="type"]').textContent = typeHints[selectedType]
     previousRangeKind = selectedRangeKind
     title.textContent = card.querySelector('[data-property="label"]').value.trim() || "Campo nuevo"
+    updateCatalogPanel()
   }
 
-  typeControl.addEventListener("change", updateFieldType)
+  // El panel de catálogo solo se ve con el tipo catálogo; al cambiar el origen
+  // se muestran los campos del archivo del proyecto o los de datos nuevos.
+  function updateCatalogPanel() {
+    const isCatalog = typeControl.value === "catalog"
+    catalogPanel.hidden = !isCatalog
+    if (!isCatalog) return
+    for (const element of card.querySelectorAll("[data-catalog-only]")) {
+      element.hidden = element.dataset.catalogOnly !== catalogSourceControl.value
+    }
+    catalogMeta.hidden = card.dataset.catalogAnalyzed !== "true"
+  }
+
+  typeControl.addEventListener("change", () => {
+    updateFieldType()
+    // Al elegir catálogo se analiza el archivo ya preseleccionado, para no
+    // obligar a pulsar «Analizar estructura» en el caso habitual.
+    if (typeControl.value === "catalog" && card.dataset.catalogAnalyzed !== "true") {
+      analyzeCatalogCard(card)
+    }
+  })
   patternPresetControl.addEventListener("change", () => {
     const preset = TEXT_PATTERN_PRESETS.find((item) => item.value === patternPresetControl.value)
     if (preset && preset.value !== "custom") {
@@ -185,10 +228,206 @@ function addField(field = {}) {
     patternPresetControl.value = matched?.value ?? (patternControl.value ? "custom" : "none")
     updateFieldType()
   })
+  // Cada cambio relevante vuelve a analizar la estructura en el servidor local:
+  // así los selectores de campos se rellenan con lo que hay de verdad en el JSON.
+  catalogSourceControl.addEventListener("change", () => {
+    updateCatalogPanel()
+    analyzeCatalogCard(card)
+  })
+  catalogFileControl.addEventListener("change", () => {
+    syncCatalogFileOptions(card, catalogFileControl.value)
+    analyzeCatalogCard(card)
+  })
+  card.querySelector("[data-catalog-analyze]").addEventListener("click", () => analyzeCatalogCard(card))
+  catalogRootKeyControl.addEventListener("change", () => analyzeCatalogCard(card))
+  let catalogAnalysisTimer = 0
+  const scheduleCatalogAnalysis = () => {
+    window.clearTimeout(catalogAnalysisTimer)
+    catalogAnalysisTimer = window.setTimeout(() => analyzeCatalogCard(card), 600)
+  }
+  catalogNameControl.addEventListener("input", scheduleCatalogAnalysis)
+  catalogDataControl.addEventListener("input", scheduleCatalogAnalysis)
+
+  if (field.catalog) {
+    for (const [property, key] of Object.entries(CATALOG_PROPERTIES)) {
+      const control = card.querySelector(`[data-property="${property}"]`)
+      if (control && field.catalog[key] != null) control.value = String(field.catalog[key])
+    }
+    catalogSourceControl.value = field.catalog.source === "inline" ? "inline" : "project"
+    syncCatalogFileOptions(card, field.catalog.file ?? "")
+  } else {
+    syncCatalogFileOptions(card)
+  }
+
   card.querySelector('[data-property="label"]').addEventListener("input", updateFieldType)
   card.querySelector(".remove-field").addEventListener("click", () => card.remove())
   fieldsList.append(card)
   updateFieldType()
+  return card
+}
+
+function fillSelect(select, options, value, fallback = "") {
+  const entries = options.length ? options : [{ value: "", label: "Sin opciones" }]
+  select.replaceChildren(...entries.map(({ value: optionValue, label }) => {
+    const option = document.createElement("option")
+    option.value = optionValue
+    option.textContent = label
+    return option
+  }))
+  const available = [...select.options]
+  const desired = value != null && available.some((option) => option.value === value) ? value : fallback
+  select.value = available.some((option) => option.value === desired) ? desired : available[0]?.value ?? ""
+}
+
+// Rellena el selector de archivos con los JSON que el servidor encontró en
+// backend/data y conserva el valor guardado aunque el archivo aún no exista.
+function syncCatalogFileOptions(card, desired = card.querySelector("[data-catalog-file]")?.value ?? "") {
+  const select = card.querySelector("[data-catalog-file]")
+  if (!select) return
+  const options = projectCatalogs.map((catalog) => ({ value: catalog.file, label: `${catalog.file} (${catalog.name})` }))
+  if (desired && !options.some((option) => option.value === desired)) {
+    options.unshift({ value: desired, label: desired })
+  }
+  if (!options.length) options.push({ value: "", label: "No hay archivos JSON en backend/data" })
+  fillSelect(select, options, desired, options[0].value)
+  card.dataset.catalogFile = select.value
+}
+
+function readCatalogMeta(card) {
+  return {
+    labelField: card.querySelector('[data-property="catalogLabelField"]').value,
+    valueField: card.querySelector('[data-property="catalogValueField"]').value,
+    idField: card.querySelector('[data-property="catalogIdField"]').value,
+    parentField: card.querySelector('[data-property="catalogParentField"]').value,
+    apiFunction: card.querySelector('[data-property="catalogApiFunction"]').value,
+  }
+}
+
+function refreshCatalogParents(card, value = "") {
+  const select = card.querySelector('[data-property="catalogParentField"]')
+  const options = [{ value: "", label: "Sin filtro: mostrar todo el catálogo" }]
+  for (const other of fieldsList.querySelectorAll(".field-card")) {
+    if (other === card) continue
+    if (other.querySelector('[data-property="type"]')?.value !== "catalog") continue
+    const name = other.querySelector('[data-property="name"]')?.value.trim()
+    if (!name) continue
+    const label = other.querySelector('[data-property="label"]')?.value.trim() || name
+    options.push({ value: name, label: `${label} (${name})` })
+  }
+  fillSelect(select, options, value)
+}
+
+function applyCatalogAnalysis(card, analysis, saved = {}) {
+  const summary = card.querySelector("[data-catalog-summary]")
+  const rootSelect = card.querySelector('[data-property="catalogRootKey"]')
+  const labelSelect = card.querySelector('[data-property="catalogLabelField"]')
+  const valueSelect = card.querySelector('[data-property="catalogValueField"]')
+  const idSelect = card.querySelector('[data-property="catalogIdField"]')
+  const apiSelect = card.querySelector('[data-property="catalogApiFunction"]')
+
+  fillSelect(
+    rootSelect,
+    analysis.arrays.map((array) => ({
+      value: array.key,
+      label: array.key
+        ? `${array.key} (${array.count} elementos)`
+        : `La raíz es una lista (${array.count} elementos)`,
+    })),
+    saved.rootKey ?? analysis.rootKey,
+    analysis.rootKey,
+  )
+
+  const fieldOptions = analysis.primitive
+    ? [{ value: "", label: "Valores simples de la lista" }]
+    : analysis.fields.map((name) => ({ value: name, label: name }))
+  fillSelect(labelSelect, fieldOptions, saved.labelField, analysis.labelField)
+  fillSelect(valueSelect, fieldOptions, saved.valueField, analysis.valueField)
+  fillSelect(
+    idSelect,
+    [{ value: "", label: "Sin identificador" }, ...fieldOptions.filter((option) => option.value)],
+    saved.idField,
+    analysis.idField,
+  )
+  refreshCatalogParents(card, saved.parentField)
+
+  const inline = card.querySelector('[data-property="catalogSource"]').value === "inline"
+  const reusable = (analysis.api?.exists ? analysis.api.functions : []).filter((entry) => entry.params === 0)
+  const apiOptions = inline || !reusable.length
+    ? [{ value: "", label: inline ? `Generar src/api/${analysis.name}.js` : "Generar un módulo nuevo" }]
+    : reusable.map((entry) => ({ value: entry.name, label: `${entry.name}() de ${analysis.api.file}` }))
+  fillSelect(apiSelect, apiOptions, saved.apiFunction, apiOptions[0].value)
+  apiSelect.disabled = inline || !analysis.api?.exists
+
+  summary.hidden = false
+  summary.className = "notice notice-info"
+  summary.replaceChildren()
+  const lead = document.createElement("p")
+  lead.textContent = `Lista «${analysis.rootKey || "raíz"}»: ${analysis.count} elementos.` +
+    (analysis.primitive ? " Contiene valores simples." : ` Campos: ${analysis.fields.join(", ")}.`)
+  summary.append(lead)
+  for (const note of analysis.notes ?? []) {
+    const paragraph = document.createElement("p")
+    paragraph.textContent = note
+    summary.append(paragraph)
+  }
+  if (analysis.route) {
+    const paragraph = document.createElement("p")
+    paragraph.textContent = `Ruta ${analysis.route.path}: ${analysis.route.exists
+      ? "ya registrada en backend/server.js"
+      : "hay que registrarla; la guía incluye el fragmento"}.`
+    summary.append(paragraph)
+  }
+  if (analysis.api?.exists) {
+    const paragraph = document.createElement("p")
+    paragraph.textContent = `Módulo ${analysis.api.file}: ${analysis.api.functions.length
+      ? analysis.api.functions.map((entry) => `${entry.name}(${entry.params})`).join(", ")
+      : "sin funciones exportadas"}.`
+    summary.append(paragraph)
+  }
+  card.dataset.catalogAnalyzed = "true"
+  card.querySelector("[data-catalog-meta]").hidden = false
+}
+
+async function analyzeCatalogCard(card, { saved } = {}) {
+  if (card.querySelector('[data-property="type"]').value !== "catalog") return null
+  const source = card.querySelector('[data-property="catalogSource"]').value
+  const file = card.querySelector("[data-catalog-file]").value
+  const name = card.querySelector('[data-property="catalogName"]').value.trim()
+  const data = card.querySelector('[data-property="catalogData"]').value
+  const rootKeySelect = card.querySelector('[data-property="catalogRootKey"]')
+  const rootKey = rootKeySelect.options.length ? rootKeySelect.value : undefined
+  const summary = card.querySelector("[data-catalog-summary]")
+  if (source === "project" && !file) return null
+  if (source === "inline" && !data.trim()) return null
+
+  const previous = { ...(saved ?? readCatalogMeta(card)) }
+  if (rootKey !== undefined) previous.rootKey = rootKey
+  summary.hidden = false
+  summary.className = "notice notice-info"
+  summary.textContent = "Analizando la estructura del catálogo…"
+  try {
+    const analysis = await postCatalogAnalysis(source === "project" ? { file, rootKey } : { name, data, rootKey })
+    applyCatalogAnalysis(card, analysis, previous)
+    return analysis
+  } catch (error) {
+    summary.className = "notice notice-error"
+    summary.textContent = error.message
+    card.dataset.catalogAnalyzed = "false"
+    card.querySelector("[data-catalog-meta]").hidden = true
+    return null
+  }
+}
+
+async function loadProjectCatalogs() {
+  try {
+    const status = await getProjectStatus()
+    projectCatalogs = status.catalogs ?? []
+  } catch {
+    projectCatalogs = []
+  }
+  for (const card of fieldsList.querySelectorAll(".field-card")) {
+    syncCatalogFileOptions(card)
+  }
 }
 
 function addRelation(relation = {}) {
@@ -255,8 +494,17 @@ function formConfig() {
     const field = {}
     for (const control of card.querySelectorAll("[data-property]")) {
       const property = control.dataset.property
-      field[property] = control.type === "checkbox" ? control.checked : control.value.trim()
+      if (CATALOG_PROPERTIES[property]) {
+        field.catalog = field.catalog || {}
+        field.catalog[CATALOG_PROPERTIES[property]] = control.value.trim()
+      } else {
+        field[property] = control.type === "checkbox" ? control.checked : control.value.trim()
+      }
     }
+    if (field.catalog) {
+      field.catalog.file = card.querySelector("[data-catalog-file]").value || field.catalog.file
+    }
+    if (field.type !== "catalog") delete field.catalog
     return field
   })
   return {
@@ -361,7 +609,7 @@ function syncSourceSelection() {
   if (!shouldShow) resourceControl.value = ""
 }
 
-function loadConfiguration(config) {
+async function loadConfiguration(config) {
   if (!config || config.version !== 1 || !config.screen || !config.entity) {
     throw new Error("El archivo no tiene el formato de configuración v1 del generador.")
   }
@@ -377,7 +625,16 @@ function loadConfiguration(config) {
   setFormValue("entityPlural", config.entity.plural)
   setFormValue("apiPath", config.entity.apiPath)
   fieldsList.replaceChildren()
-  for (const field of config.fields || []) addField(field)
+  // Los campos catálogo vuelven a analizarse para rellenar sus selectores con
+  // la estructura real del archivo y conservar lo que se había elegido.
+  const catalogAnalyses = []
+  for (const field of config.fields || []) {
+    const card = addField(field)
+    if (field.type === "catalog" && field.catalog) {
+      catalogAnalyses.push(analyzeCatalogCard(card, { saved: field.catalog }))
+    }
+  }
+  await Promise.all(catalogAnalyses)
   relationsList.replaceChildren()
   for (const relation of config.relations || []) addRelation(relation)
   piniaEnabled.checked = Boolean(config.pinia?.enabled)
@@ -448,7 +705,7 @@ document.querySelector("#load-config-input").addEventListener("change", async (e
   const file = event.currentTarget.files?.[0]
   if (!file) return
   try {
-    loadConfiguration(JSON.parse(await file.text()))
+    await loadConfiguration(JSON.parse(await file.text()))
     showNotice(previewMessage, `Se cargó ${file.name}. Comprueba los campos y las operaciones antes de generar.`, "success")
   } catch (error) {
     showNotice(generationErrors, `No se pudo cargar la configuración: ${error.message}`, "error")
@@ -473,3 +730,4 @@ addField({
   max: "80",
 })
 ui.loadProjectStatus()
+loadProjectCatalogs()

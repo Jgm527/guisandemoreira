@@ -448,6 +448,49 @@ kbd {
   padding: 1px 5px;
 }
 
+.catalog-panel {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  border-top: 1px dashed #d5e0e6;
+  padding-top: 16px;
+}
+
+.catalog-panel h4 {
+  margin: 0 0 4px;
+  color: #1b4965;
+}
+
+.catalog-panel > p {
+  margin-bottom: 14px;
+  color: #63727b;
+  font-size: 0.9rem;
+}
+
+.catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.catalog-actions span {
+  color: #63727b;
+  font-size: 0.85rem;
+}
+
+.catalog-meta {
+  margin-top: 14px;
+}
+
+.catalog-panel .notice p {
+  margin-bottom: 6px;
+}
+
+.catalog-panel .notice p:last-child {
+  margin-bottom: 0;
+}
+
 [hidden] {
   display: none !important;
 }

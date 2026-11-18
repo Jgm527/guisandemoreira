@@ -1,4 +1,10 @@
 import { RESOURCE_LIBRARY, escapeHtml, js, singularPluralName, slugify } from "../datos.js"
+import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
+
+const pascalCase = (value) => {
+  const text = String(value ?? "")
+  return text ? text[0].toUpperCase() + text.slice(1) : ""
+}
 
 function defaultValue(field) {
   if (field.defaultValue === "") return field.type === "boolean" ? false : field.type === "number" ? "" : ""
@@ -7,7 +13,7 @@ function defaultValue(field) {
   return field.defaultValue
 }
 
-function fieldControl(field) {
+function fieldControl(field, context = {}) {
   const id = `campo-${field.name}`
   const required = field.required ? " required" : ""
   const pattern = field.pattern || (field.type === "email" ? "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" : "")
@@ -44,6 +50,23 @@ ${field.options.map((option) => `        <label class="flex items-center gap-2">
           <option value="">Selecciona una opción</option>
 ${field.options.map((option) => `          <option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("\n")}
         </select>
+      </div>`
+  }
+  if (field.type === "catalog") {
+    const catalog = field.catalog
+    const variable = context.catalogVar ?? `catalogo${pascalCase(field.name)}`
+    const list = context.listExpression ?? variable
+    const keyExpression = catalog.idField ? propertyAccess("item", catalog.idField) : "item"
+    const valueExpression = catalog.valueField ? propertyAccess("item", catalog.valueField) : "item"
+    const textExpression = catalog.labelField ? `{{ ${propertyAccess("item", catalog.labelField)} }}` : "{{ item }}"
+    const onChange = context.onChange ? ` @change="${context.onChange}"` : ""
+    return `      <div class="grid gap-2">
+        <label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>
+        <select id="${id}" v-model="registro.${field.name}" class="rounded border border-gray-300 bg-white p-2"${required}${onChange} :disabled="${list}.length === 0">
+          <option value="">Selecciona ${escapeHtml(field.label.toLowerCase())}</option>
+          <option v-for="item in ${list}" :key="${keyExpression}" :value="${valueExpression}">${textExpression}</option>
+        </select>
+        <small v-if="${list}.length === 0" class="text-sm text-gray-600">El catálogo ${escapeHtml(catalog.name)} está vacío o no se pudo cargar.</small>
       </div>`
   }
   if (field.type === "textarea") {
@@ -101,14 +124,38 @@ export function generateComponent(config) {
   if (operations.has("delete")) apiImports.push(resourceDetails.apiFunctions.delete || `delete${singular}`)
   const fieldsInForm = config.fields.filter((field) => field.form)
   const listFields = config.fields.filter((field) => field.list)
+  // Catálogos JSON: cada campo catálogo tiene su lista y, si se pidió, se filtra
+  // por otro campo catálogo del mismo formulario.
+  const formCatalogFields = hasForm
+    ? config.fields.filter((field) => field.form && field.type === "catalog")
+    : []
+  const dependentCatalogFields = formCatalogFields.filter((field) => field.catalog.parentField)
+  const catalogChildren = new Map()
+  for (const field of dependentCatalogFields) {
+    const children = catalogChildren.get(field.catalog.parentField) ?? []
+    children.push(field)
+    catalogChildren.set(field.catalog.parentField, children)
+  }
+  function fieldContext(field) {
+    if (field.type !== "catalog") return {}
+    const variable = `catalogo${pascalCase(field.name)}`
+    return {
+      catalogVar: variable,
+      listExpression: field.catalog.parentField ? `${variable}Visibles` : variable,
+      onChange: catalogChildren.has(field.name) ? `cambiar${pascalCase(field.name)}` : "",
+    }
+  }
   const initialValues = Object.fromEntries([
     ...config.fields.map((field) => [field.name, defaultValue(field)]),
     ...relations.map((relation) => [relation.fieldName, ""]),
   ])
   const scriptImports = ["ref"]
   if (hasForm) scriptImports.push("reactive")
-  if (apiRelations.length > 0 || piniaRelations.some((relation) => relation.required)) scriptImports.push("computed")
-  if (hasList || apiRelations.length) scriptImports.push("onMounted")
+  const needsComputed = apiRelations.length > 0 ||
+    piniaRelations.some((relation) => relation.required) ||
+    dependentCatalogFields.length > 0
+  if (needsComputed) scriptImports.push("computed")
+  if (hasList || apiRelations.length || formCatalogFields.length) scriptImports.push("onMounted")
   const alertImports = ["alertaError"]
   if (hasForm || operations.has("delete")) alertImports.push("alertaExito")
   if (operations.has("delete")) alertImports.push("alertaConfirmacion")
@@ -166,7 +213,7 @@ export function generateComponent(config) {
         ? '    <form v-if="editingId" class="mb-8 grid gap-4" @submit.prevent="guardar">'
         : '    <form class="mb-8 grid gap-4" @submit.prevent="guardar">',
       ...relations.map((relation) => relationFormControl(relation)),
-      ...fieldsInForm.map(fieldControl),
+      ...fieldsInForm.map((field) => fieldControl(field, fieldContext(field))),
       '      <div class="flex flex-wrap gap-3">',
       `        <button type="submit"${showWhenEditing ? ' v-if="editingId"' : ""} class="rounded bg-[#1b4965] px-4 py-2 font-semibold text-white disabled:opacity-60" :disabled="saving${piniaRequiredMissing ? " || faltanRelacionesObligatorias" : ""}">${submitLabel}</button>`,
       operations.has("edit") && hasList
@@ -240,6 +287,15 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     }
     if (!group.functions.includes(listFunction)) group.functions.push(listFunction)
   }
+  // Módulos de API de los catálogos usados por el formulario. Se agrupan por
+  // archivo para no repetir imports del mismo catálogo.
+  const catalogImports = new Map()
+  for (const field of formCatalogFields) {
+    const modulePath = `../api/${field.catalog.name}.js`
+    const functions = catalogImports.get(modulePath) ?? new Set()
+    functions.add(field.catalog.apiFunction || catalogApiFunctionName(field.catalog.name))
+    catalogImports.set(modulePath, functions)
+  }
   const script = [
     "<script setup>",
     `// Dónde va: src/components/${component}.vue, continuando el bloque <template> de arriba.`,
@@ -249,6 +305,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     `import { ${scriptImports.join(", ")} } from "vue";`,
     `import { ${apiImports.join(", ")} } from "${resourceDetails.modulePath}";`,
     ...relatedApiImports.map((group) => `import { ${group.functions.join(", ")} } from "${group.module}";`),
+    ...[...catalogImports].map(([modulePath, functions]) => `import { ${[...functions].join(", ")} } from "${modulePath}";`),
     ...[...storeVars.values()].map(({ store }) => `import { ${store.importName} } from "../store/${store.file}";`),
     ...(ownStore ? [`import { ${ownStore.importName} } from "../store/${ownStore.file}";`] : []),
     `import { ${alertImports.join(", ")} } from "../utils/alertas.js";`,
@@ -370,6 +427,62 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
           return `!${variable}.${store.relationValueProp || store.idProp}`
         })
         .join(" || ")});`,
+      "",
+    )
+  }
+  if (formCatalogFields.length) {
+    script.push(
+      "// Catálogos JSON: cada ref guarda la lista del archivo de backend/data que sirve",
+      "// el backend; los <select> del formulario recorren estas listas.",
+      ...formCatalogFields.map((field) => `const catalogo${pascalCase(field.name)} = ref([]);`),
+      "",
+    )
+    for (const field of dependentCatalogFields) {
+      const parent = config.fields.find((item) => item.name === field.catalog.parentField)
+      const variable = `catalogo${pascalCase(field.name)}`
+      const parentVariable = `catalogo${pascalCase(parent.name)}`
+      const parentValue = propertyAccess("item", parent.catalog.valueField || parent.catalog.idField)
+      const parentId = propertyAccess("padre", parent.catalog.idField)
+      const childId = propertyAccess("item", field.catalog.idField)
+      script.push(
+        `// ${field.label} se filtra por ${parent.label}: el identificador del catálogo hijo`,
+        "// empieza por el identificador del registro elegido en «" + parent.label +
+          "» (patrón provincia → municipio de XestionPacientes.vue).",
+        `const ${variable}Visibles = computed(() => {`,
+        `  const padre = ${parentVariable}.value.find((item) => String(${parentValue}) === String(registro.${parent.name}));`,
+        "  if (!padre) return [];",
+        `  const prefijo = String(${parentId} ?? "");`,
+        `  return ${variable}.value.filter((item) => String(${childId} ?? "").startsWith(prefijo));`,
+        "});",
+        "",
+      )
+    }
+    for (const [parentName, children] of catalogChildren) {
+      const parent = config.fields.find((item) => item.name === parentName)
+      script.push(
+        `// Al cambiar ${parent.label} se vacía la selección dependiente para no guardar`,
+        "// un valor que pertenece a otra lista del catálogo.",
+        `function cambiar${pascalCase(parentName)}() {`,
+        ...children.map((child) => `  registro.${child.name} = "";`),
+        "}",
+        "",
+      )
+    }
+    script.push(
+      "// Carga los catálogos de los selectores; cada función viene de su módulo de",
+      "// src/api/ y su archivo JSON se sirve desde backend/data.",
+      "async function cargarCatalogos() {",
+      ...formCatalogFields.flatMap((field) => {
+        const loadFunction = field.catalog.apiFunction || catalogApiFunctionName(field.catalog.name)
+        return [
+          "  try {",
+          `    catalogo${pascalCase(field.name)}.value = await ${loadFunction}();`,
+          "  } catch (requestError) {",
+          `    alertaError(mensaxeDoErro(requestError, "No se pudo cargar el catálogo «${field.catalog.name}»."), "Error al cargar");`,
+          "  }",
+        ]
+      }),
+      "}",
       "",
     )
   }
@@ -555,12 +668,15 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
       "}",
     )
   }
-  if (hasList && apiRelations.length) {
-    script.push("", "onMounted(() => {", "  cargar();", "  cargarRelaciones();", "});")
-  } else if (hasList) {
-    script.push("", "onMounted(cargar);")
-  } else if (apiRelations.length) {
-    script.push("", "onMounted(cargarRelaciones);")
+  const mountedCalls = [
+    hasList ? "cargar" : "",
+    apiRelations.length ? "cargarRelaciones" : "",
+    formCatalogFields.length ? "cargarCatalogos" : "",
+  ].filter(Boolean)
+  if (mountedCalls.length === 1) {
+    script.push("", `onMounted(${mountedCalls[0]});`)
+  } else if (mountedCalls.length > 1) {
+    script.push("", "onMounted(() => {", ...mountedCalls.map((call) => `  ${call}();`), "});")
   }
   script.push("</script>", "")
   return `${componentTemplate.filter(Boolean).join("\n")}\n\n${script.filter(Boolean).join("\n")}`

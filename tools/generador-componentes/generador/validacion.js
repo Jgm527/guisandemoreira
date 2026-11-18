@@ -1,3 +1,4 @@
+import { CATALOG_SOURCES, analyzeCatalog, catalogDataFile, catalogNameFromFile } from "./catalogos.js"
 import {
   FIELD_TYPES,
   OPERATIONS,
@@ -13,6 +14,30 @@ import {
   parseOptions,
   parsePattern,
 } from "./datos.js"
+
+function normalizeCatalog(input) {
+  const catalog = input && typeof input === "object" && !Array.isArray(input) ? input : {}
+  const source = String(catalog.source ?? "project").trim() || "project"
+  const file = String(catalog.file ?? "").replaceAll("\\", "/").trim()
+  const name = String(catalog.name ?? "").trim() || catalogNameFromFile(file)
+  return {
+    source,
+    name,
+    // El archivo siempre es backend/data/<nombre>.json: la ruta generada,
+    // el módulo de API y el JSON deben compartir el mismo nombre.
+    file: source === "project" ? (catalogNameFromFile(file) ? file : catalogDataFile(name)) : "",
+    rootKey: String(catalog.rootKey ?? ""),
+    idField: String(catalog.idField ?? "").trim(),
+    labelField: String(catalog.labelField ?? "").trim(),
+    valueField: String(catalog.valueField ?? "").trim(),
+    parentField: String(catalog.parentField ?? "").trim(),
+    apiFunction: String(catalog.apiFunction ?? "").trim(),
+    primitive: Boolean(catalog.primitive),
+    routeExists: Boolean(catalog.routeExists),
+    count: Number.isInteger(catalog.count) ? catalog.count : null,
+    data: source === "inline" ? String(catalog.data ?? "") : "",
+  }
+}
 
 function normalizeField(field) {
   const type = String(field.type ?? "")
@@ -38,6 +63,146 @@ function normalizeField(field) {
     form: field.form !== false,
     list: Boolean(field.list),
     search: Boolean(field.search),
+    ...(type === "catalog" ? { catalog: normalizeCatalog(field.catalog) } : {}),
+  }
+}
+
+// Analiza la estructura del catálogo y completa lo que no se haya indicado. Un
+// campo catálogo guarda un valor de una lista JSON: no usa opciones fijas, así
+// que su configuración se valida aparte.
+function validateCatalogField(field, prefix, errors) {
+  const catalog = field.catalog
+  if (!CATALOG_SOURCES.has(catalog.source)) {
+    errors.push(`${prefix}: elige el origen del catálogo: un archivo del proyecto o datos JSON nuevos.`)
+    return
+  }
+  if (!/^[a-z][a-z0-9]*$/.test(catalog.name) || catalog.name.length > 40) {
+    errors.push(`${prefix}: el nombre del catálogo debe empezar en minúscula y usar solo letras y números (por ejemplo, especialidades).`)
+  }
+  if (catalog.apiFunction && !/^[A-Za-z_$][\w$]*$/.test(catalog.apiFunction)) {
+    errors.push(`${prefix}: la función de la API del catálogo no es un nombre de función válido.`)
+  }
+  if (catalog.source === "inline" && catalog.apiFunction) {
+    errors.push(`${prefix}: los datos nuevos generan siempre su propio módulo de API; no se puede reutilizar una función existente.`)
+  }
+  if (catalog.source === "project") {
+    if (!catalog.primitive) {
+      if (!catalog.labelField) {
+        errors.push(`${prefix}: analiza el catálogo y elige el campo visible (por ejemplo, nm).`)
+      }
+      if (!catalog.valueField) {
+        errors.push(`${prefix}: analiza el catálogo y elige el campo que se guardará en el formulario (por ejemplo, nm).`)
+      }
+    }
+    return
+  }
+
+  if (!catalog.data.trim()) {
+    errors.push(`${prefix}: pega los datos JSON del catálogo nuevo.`)
+    return
+  }
+  if (catalog.data.length > 300000) {
+    errors.push(`${prefix}: los datos del catálogo nuevo no pueden superar 300 KB.`)
+    return
+  }
+  const analysis = analyzeCatalog(catalog.data, {
+    name: catalog.name,
+    rootKey: catalog.rootKey === "" ? undefined : catalog.rootKey,
+  })
+  if (!analysis.ok) {
+    errors.push(`${prefix}: ${analysis.error}`)
+    return
+  }
+  catalog.primitive = analysis.primitive
+  catalog.rootKey = analysis.rootKey
+  catalog.count = analysis.count
+  if (analysis.primitive) {
+    catalog.labelField = ""
+    catalog.valueField = ""
+    catalog.idField = ""
+  } else {
+    if (!catalog.labelField) catalog.labelField = analysis.labelField
+    if (!catalog.valueField) catalog.valueField = analysis.valueField
+    if (!catalog.idField) catalog.idField = analysis.idField
+    if (!catalog.labelField) {
+      errors.push(`${prefix}: el catálogo no tiene un campo de texto visible; añade una etiqueta a cada elemento.`)
+    }
+    for (const [key, label] of [
+      ["labelField", "campo visible"],
+      ["valueField", "valor guardado"],
+      ["idField", "identificador"],
+    ]) {
+      if (catalog[key] && !analysis.fields.includes(catalog[key])) {
+        errors.push(`${prefix}: el ${label} «${catalog[key]}» no existe en el catálogo. Campos disponibles: ${analysis.fields.join(", ")}.`)
+      }
+    }
+  }
+  // Se guarda el JSON ya analizado y ordenado: es el archivo que se genera.
+  catalog.data = `${JSON.stringify(analysis.parsed, null, 2)}\n`
+}
+
+// Los catálogos se comparten entre campos: dos campos pueden leer la misma lista,
+// pero deben coincidir en la lista, el origen y los campos del JSON.
+function validateCatalogGroup(fields, errors) {
+  const catalogs = fields.filter((field) => field.type === "catalog" && field.catalog)
+  const byName = new Map()
+  for (const field of catalogs) {
+    const catalog = field.catalog
+    const signature = JSON.stringify({
+      source: catalog.source,
+      rootKey: catalog.rootKey,
+      idField: catalog.idField,
+      labelField: catalog.labelField,
+      apiFunction: catalog.apiFunction,
+      primitive: catalog.primitive,
+      data: catalog.source === "inline" ? catalog.data : "",
+    })
+    const previous = byName.get(catalog.name)
+    if (previous && previous.signature !== signature) {
+      errors.push(
+        `Los campos «${previous.field.name}» y «${field.name}» usan el catálogo «${catalog.name}» con configuraciones distintas; usa la misma lista y los mismos campos del JSON.`,
+      )
+    } else if (!previous) {
+      byName.set(catalog.name, { field, signature })
+    }
+  }
+
+  for (const field of catalogs) {
+    const parentName = field.catalog.parentField
+    if (!parentName) continue
+    if (parentName === field.name) {
+      errors.push(`Campo ${field.name}: un catálogo no puede filtrarse por sí mismo.`)
+      continue
+    }
+    const parent = catalogs.find((item) => item.name === parentName)
+    if (!parent) {
+      errors.push(`Campo ${field.name}: el selector del que depende («${parentName}») debe ser otro campo catálogo de esta pantalla.`)
+      continue
+    }
+    if (!parent.form) {
+      errors.push(`Campo ${field.name}: «${parentName}» debe aparecer en el formulario para poder filtrar el catálogo.`)
+    }
+    if (parent.catalog.primitive || !parent.catalog.idField) {
+      errors.push(`Campo ${field.name}: «${parentName}» necesita un campo identificador en su catálogo para filtrar este selector.`)
+    }
+    if (field.catalog.primitive || !field.catalog.idField) {
+      errors.push(`Campo ${field.name}: este catálogo necesita un campo identificador para poder filtrarse por «${parentName}».`)
+    }
+    // Evita cadenas circulares (A depende de B y B de A).
+    let current = parent
+    const visited = new Set([field.name])
+    while (current?.catalog.parentField) {
+      if (visited.has(current.name)) {
+        errors.push(`Campo ${field.name}: la dependencia entre catálogos es circular.`)
+        break
+      }
+      visited.add(current.name)
+      current = catalogs.find((item) => item.name === current.catalog.parentField)
+      if (current?.name === field.name) {
+        errors.push(`Campo ${field.name}: la dependencia entre catálogos es circular.`)
+        break
+      }
+    }
   }
 }
 
@@ -253,6 +418,7 @@ export function validateConfiguration(input) {
     seenFields.add(field.name)
     if (!field.label) errors.push(`${prefix}: escribe una etiqueta visible.`)
     if (!FIELD_TYPES.has(field.type)) errors.push(`${prefix}: selecciona un tipo de campo admitido.`)
+    if (field.type === "catalog") validateCatalogField(field, prefix, errors)
 
     if (["select", "radio"].includes(field.type)) {
       if (field.options.length === 0 || field.options.some((option) => !option.value || !option.label)) {
@@ -382,6 +548,8 @@ export function validateConfiguration(input) {
       errors.push(`${prefix}: un campo obligatorio que no aparece en el formulario necesita un valor inicial para poder crear registros.`)
     }
   }
+
+  validateCatalogGroup(fields, errors)
 
   const resourceMeta = source === "existing" && existingResource && RESOURCE_LIBRARY[existingResource]
     ? RESOURCE_LIBRARY[existingResource]

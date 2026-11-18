@@ -1,9 +1,11 @@
 import { RESOURCE_LIBRARY, slugify } from "./generador/datos.js"
+import { collectCatalogs } from "./generador/catalogos.js"
 import { validateConfiguration } from "./generador/validacion.js"
 import {
   generateModel,
   generateRoutes,
   generateApi,
+  generateCatalogApi,
 } from "./generador/plantillas/backend.js"
 import { generateComponent } from "./generador/plantillas/componente.js"
 import { generateStore } from "./generador/plantillas/store.js"
@@ -24,6 +26,18 @@ export function generateFiles(config) {
     "configuracion.json": `${JSON.stringify(normalized, null, 2)}\n`,
   }
 
+  // Catálogos JSON declarados en los campos. Los datos propios se escriben en
+  // backend/data y el módulo de API solo se genera cuando la pantalla no
+  // reutiliza una función que ya existe en src/api/.
+  for (const catalog of collectCatalogs(normalized)) {
+    if (catalog.source === "inline") {
+      files[`backend/data/${catalog.name}.json`] = catalog.data
+    }
+    if (!catalog.apiFunction) {
+      files[`src/api/${catalog.name}.js`] = generateCatalogApi(catalog)
+    }
+  }
+
   if (normalized.source === "existing") {
     files[`src/components/${normalized.screen.component}.vue`] = generateComponent(normalized)
     files["INSTRUCCIONES.md"] = generateInstructions(normalized)
@@ -39,6 +53,14 @@ export function generateFiles(config) {
   files[`src/components/${normalized.screen.component}.vue`] = generateComponent(normalized)
   files["INSTRUCCIONES.md"] = generateInstructions(normalized)
   return { files, config: normalized, outputSlug: slugify(normalized.screen.component) }
+}
+
+// Módulos de catálogo que el componente importa y que ya existen en el proyecto:
+// la generación no los duplica, pero la guía y las comprobaciones los necesitan.
+export function catalogRequiredFiles(config) {
+  return collectCatalogs(config)
+    .filter((catalog) => catalog.apiFunction)
+    .map((catalog) => `src/api/${catalog.name}.js`)
 }
 
 // Archivos del proyecto que las relaciones exigen de verdad. server.js los

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { PassThrough } from "node:stream"
@@ -657,4 +657,225 @@ test("aplica restricciones por tipo en formulario, modelo y valores iniciales", 
   config.fields[2].defaultValue = "10:30"
   config.fields[2].max = "08:00"
   assert.ok(validateConfiguration(config).errors.some((error) => error.includes("mínimo no puede ser mayor")))
+})
+
+test("analiza la estructura de un catálogo JSON y detecta la lista y sus campos", async () => {
+  const { analyzeCatalog } = await import("../generador/catalogos.js")
+
+  const rootList = analyzeCatalog(JSON.stringify([
+    { codigo: "A1", descripcion: "Uno" },
+    { codigo: "A2", descripcion: "Dos" },
+  ]))
+  assert.equal(rootList.ok, true)
+  assert.equal(rootList.rootKey, "")
+  assert.equal(rootList.idField, "codigo")
+  assert.equal(rootList.labelField, "descripcion")
+  assert.equal(rootList.count, 2)
+
+  const wrapped = analyzeCatalog(JSON.stringify({
+    provincias: [{ id: "01", nm: "Álava" }],
+    municipios: [{ id: "01001", nm: "Alegría" }, { id: "01002", nm: "Amurrio" }],
+  }), { name: "municipios" })
+  assert.equal(wrapped.rootKey, "municipios")
+  assert.equal(wrapped.valueField, "nm")
+  assert.ok(wrapped.notes.some((note) => note.includes("provincias")))
+
+  const repeated = analyzeCatalog(JSON.stringify([{ id: 1, nm: "Igual" }, { id: 2, nm: "Igual" }]))
+  assert.equal(repeated.valueField, "id")
+  assert.equal(repeated.duplicateLabels, true)
+
+  const broken = analyzeCatalog("{\"datos\": 3}")
+  assert.equal(broken.ok, false)
+})
+
+test("genera un catálogo nuevo desde los datos pegados y lo integra en el formulario", () => {
+  const config = validConfiguration()
+  config.operations = ["list", "create"]
+  config.fields = [
+    {
+      name: "provincia",
+      label: "Provincia",
+      type: "catalog",
+      required: true,
+      form: true,
+      list: true,
+      catalog: {
+        source: "inline",
+        name: "provincias",
+        data: JSON.stringify({ provincias: [{ id: "01", nm: "Álava" }, { id: "02", nm: "Albacete" }] }),
+      },
+    },
+  ]
+
+  const validation = validateConfiguration(config)
+  assert.deepEqual(validation.errors, [])
+  const catalog = validation.config.fields[0].catalog
+  assert.equal(catalog.labelField, "nm")
+  assert.equal(catalog.valueField, "nm")
+  assert.equal(catalog.idField, "id")
+  assert.equal(catalog.count, 2)
+
+  const generated = generateFiles(config)
+  assert.ok(generated.files["backend/data/provincias.json"])
+  assert.ok(generated.files["src/api/provincias.js"])
+  assert.match(generated.files["src/api/provincias.js"], /respuesta\.data\.provincias/)
+  assert.match(generated.files["backend/modelos/Tarea.js"], /provincia: \{ type: String, required: true, trim: true \}/)
+  const component = generated.files["src/components/GestionTareas.vue"]
+  assert.match(component, /import \{ obtenerProvincias \} from "\.\.\/api\/provincias\.js"/)
+  assert.match(component, /v-for="item in catalogoProvincia"/)
+  assert.match(component, /:value="item\.nm"/)
+  assert.match(component, /cargarCatalogos\(\)/)
+  assert.match(generated.files["INSTRUCCIONES.md"], /app\.get\("\/api\/provincias"/)
+
+  const filename = "GestionTareas.vue"
+  const parsed = parse(component, { filename })
+  assert.deepEqual(parsed.errors, [])
+  assert.doesNotThrow(() => compileScript(parsed.descriptor, { id: "generator-catalog" }))
+  const template = compileTemplate({ source: parsed.descriptor.template.content, filename, id: "generator-catalog" })
+  assert.deepEqual(template.errors, [])
+})
+
+test("reutiliza la API de un catálogo existente sin duplicar backend", () => {
+  const config = validConfiguration()
+  config.fields = [
+    {
+      name: "espedoc",
+      label: "Especialidad",
+      type: "catalog",
+      required: true,
+      form: true,
+      list: true,
+      catalog: {
+        source: "project",
+        name: "especialidades",
+        file: "backend/data/especialidades.json",
+        rootKey: "especialidades",
+        idField: "id",
+        labelField: "nm",
+        valueField: "nm",
+        apiFunction: "obtenerEspecialidades",
+        routeExists: true,
+      },
+    },
+  ]
+
+  assert.deepEqual(validateConfiguration(config).errors, [])
+  const generated = generateFiles(config)
+  assert.equal(generated.files["src/api/especialidades.js"], undefined)
+  assert.equal(generated.files["backend/data/especialidades.json"], undefined)
+  const component = generated.files["src/components/GestionTareas.vue"]
+  assert.match(component, /import \{ obtenerEspecialidades \} from "\.\.\/api\/especialidades\.js"/)
+  assert.match(component, /catalogoEspedoc\.value = await obtenerEspecialidades\(\)/)
+  assert.match(generated.files["INSTRUCCIONES.md"], /se reutiliza la función/)
+  assert.match(generated.files["INSTRUCCIONES.md"], /ya está registrada en/)
+})
+
+test("filtra un catálogo por otro selector y rechaza dependencias incoherentes", () => {
+  const config = validConfiguration()
+  config.fields = [
+    {
+      name: "provincia",
+      label: "Provincia",
+      type: "catalog",
+      required: true,
+      form: true,
+      list: true,
+      catalog: { source: "inline", name: "provincias", data: JSON.stringify({ provincias: [{ id: "01", nm: "Álava" }] }) },
+    },
+    {
+      name: "municipio",
+      label: "Municipio",
+      type: "catalog",
+      required: false,
+      form: true,
+      list: true,
+      catalog: {
+        source: "inline",
+        name: "municipios",
+        data: JSON.stringify({ municipios: [{ id: "01001", nm: "Alegría" }] }),
+        parentField: "provincia",
+      },
+    },
+  ]
+  assert.deepEqual(validateConfiguration(config).errors, [])
+  const component = generateFiles(config).files["src/components/GestionTareas.vue"]
+  assert.match(component, /const catalogoMunicipioVisibles = computed/)
+  assert.match(component, /String\(item\.id \?\? ""\)\.startsWith\(prefijo\)/)
+  assert.match(component, /@change="cambiarProvincia"/)
+  assert.match(component, /function cambiarProvincia\(\)/)
+  assert.match(component, /registro\.municipio = ""/)
+
+  const wrongParent = structuredClone(config)
+  wrongParent.fields[1].catalog.parentField = "titulo"
+  assert.ok(validateConfiguration(wrongParent).errors.some((error) => error.includes("debe ser otro campo catálogo")))
+
+  const duplicatedCatalog = structuredClone(config)
+  duplicatedCatalog.fields[1].catalog.name = "provincias"
+  duplicatedCatalog.fields[1].catalog.data = JSON.stringify({ municipios: [{ id: "01001", nm: "Alegría" }] })
+  assert.ok(validateConfiguration(duplicatedCatalog).errors.some((error) => error.includes("configuraciones distintas")))
+})
+
+test("el asistente de terminal genera un campo catálogo reutilizando la API del proyecto", async () => {
+  const temporary = await mkdtemp(path.join(os.tmpdir(), "generador-terminal-catalogo-"))
+  const output = new PassThrough()
+  let transcript = ""
+  output.on("data", (chunk) => { transcript += chunk.toString() })
+  await mkdir(path.join(temporary, "backend", "data"), { recursive: true })
+  await mkdir(path.join(temporary, "src", "api"), { recursive: true })
+  await writeFile(
+    path.join(temporary, "backend", "data", "especialidades.json"),
+    JSON.stringify({ especialidades: [{ id: 1, nm: "Cardiología" }, { id: 2, nm: "Pediatría" }] }),
+  )
+  await writeFile(
+    path.join(temporary, "src", "api", "especialidades.js"),
+    "export async function obtenerEspecialidades() { return []; }\n",
+  )
+  await writeFile(
+    path.join(temporary, "backend", "server.js"),
+    "app.get(\"/api/especialidades\", (req, res) => res.json({ especialidades: [] }));\n",
+  )
+  const answers = {
+    "Nombre visible de la pantalla": "Pruebas catálogo",
+    "Nombre técnico del componente (PascalCase)": "GestionCatalogo",
+    "Ruta del navegador": "/gestion-catalogo",
+    "Texto del menú (opcional)": "",
+    "Nombre singular de la entidad (PascalCase)": "Prueba",
+    "Nombre plural / colección (minúsculas)": "pruebas",
+    "Nombre técnico": "espedoc",
+    "Etiqueta visible": "Especialidad",
+  }
+  const promptOverrides = {
+    ask: async (label, defaultValue = "") => answers[label] ?? defaultValue,
+    choose: async (label, choices, defaultValue) => {
+      if (label === "Tipo de dato") return "catalog"
+      if (label === "Origen del catálogo") return "project"
+      return choices.some(({ value }) => value === defaultValue) ? defaultValue : choices[0].value
+    },
+    chooseMany: async (label, choices, defaultValues) => label.startsWith("Selecciona las operaciones")
+      ? ["list", "create"]
+      : defaultValues,
+    confirm: async (label, defaultValue = false) => label === "¿Generar estos archivos?" || defaultValue,
+    count: async (label, { defaultValue }) => defaultValue,
+  }
+  try {
+    const generated = await runTerminal({
+      output,
+      projectRoot: temporary,
+      outputRoot: path.join(temporary, "salidas"),
+      promptOverrides,
+    })
+    assert.equal(generated, true, transcript)
+    const outputDirectory = path.join(temporary, "salidas", "gestion-catalogo")
+    const config = JSON.parse(await readFile(path.join(outputDirectory, "configuracion.json"), "utf8"))
+    assert.equal(config.fields[0].catalog.apiFunction, "obtenerEspecialidades")
+    assert.equal(config.fields[0].catalog.labelField, "nm")
+    const component = await readFile(path.join(outputDirectory, "src", "components", "GestionCatalogo.vue"), "utf8")
+    assert.match(component, /obtenerEspecialidades/)
+    const apiFiles = await readdir(path.join(outputDirectory, "src", "api"))
+    assert.deepEqual(apiFiles, ["pruebas.js"])
+    assert.match(transcript, /Detectado: lista «especialidades» con 2 elementos/)
+  } finally {
+    output.destroy()
+    await rm(temporary, { recursive: true, force: true })
+  }
 })

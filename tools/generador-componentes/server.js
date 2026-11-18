@@ -1,9 +1,19 @@
 import { createServer } from "node:http"
 import { randomUUID } from "node:crypto"
-import { access, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { access, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { publishGeneratedDirectory } from "./generador/archivos.js"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { generateFiles, validateConfiguration, relationRequiredFiles } from "./generador.js"
+import { analyzeCatalog, catalogRoutePath } from "./generador/catalogos.js"
+import {
+  analyzeProjectCatalog,
+  catalogRouteExists,
+  describeCatalogApi,
+  enrichCatalogs,
+  listProjectCatalogFiles,
+  publicCatalogAnalysis,
+} from "./generador/catalogos-proyecto.js"
 
 if (process.argv.includes("--terminal")) {
   if (!process.stdin.isTTY) {
@@ -241,12 +251,51 @@ async function projectStatus() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error
   }
-  return { resources, outputs }
+  return {
+    resources,
+    outputs,
+    // Catálogos JSON que el formulario puede usar en un campo de tipo catálogo.
+    catalogs: await listProjectCatalogFiles(PROJECT_ROOT),
+  }
+}
+
+// Analiza la estructura de un catálogo: un archivo real de backend/data o los
+// datos pegados en el formulario. Devuelve la lista detectada, sus campos y lo
+// que el proyecto ya tiene para ese catálogo (módulo de API y ruta).
+async function handleCatalogAnalysis(request, response) {
+  const input = await readJson(request)
+  const rootKey = typeof input?.rootKey === "string" ? input.rootKey : undefined
+  const file = typeof input?.file === "string" ? input.file.trim() : ""
+  if (file) {
+    const analysis = await analyzeProjectCatalog(PROJECT_ROOT, file, { rootKey })
+    return send(response, 200, publicCatalogAnalysis(analysis))
+  }
+
+  const name = String(input?.name ?? "").trim()
+  const analysis = analyzeCatalog(String(input?.data ?? ""), { name, rootKey })
+  if (!analysis.ok) {
+    return send(response, 400, { message: analysis.error })
+  }
+  if (/^[a-z][a-z0-9]*$/.test(name)) {
+    const api = await describeCatalogApi(PROJECT_ROOT, name)
+    const route = { path: catalogRoutePath(name), exists: await catalogRouteExists(PROJECT_ROOT, name) }
+    return send(response, 200, publicCatalogAnalysis({ ...analysis, api, route }))
+  }
+  return send(response, 200, publicCatalogAnalysis(analysis))
+}
+
+// Toda solicitud pasa por aquí: completa los campos catálogo con la estructura
+// real de sus archivos y valida una sola vez, tanto la vista previa como la
+// generación definitiva.
+async function prepareConfiguration(request) {
+  const input = await readJson(request)
+  const { input: enriched, errors: catalogErrors } = await enrichCatalogs(PROJECT_ROOT, input)
+  const { errors } = validateConfiguration(enriched)
+  return { input: enriched, errors: [...catalogErrors, ...errors] }
 }
 
 async function handlePreview(request, response) {
-  const input = await readJson(request)
-  const { errors } = validateConfiguration(input)
+  const { input, errors } = await prepareConfiguration(request)
   if (errors.length) {
     return send(response, 400, { message: "Revisa los datos del formulario.", errors })
   }
@@ -267,8 +316,7 @@ async function handlePreview(request, response) {
 }
 
 async function handleGenerate(request, response) {
-  const input = await readJson(request)
-  const { errors } = validateConfiguration(input)
+  const { input, errors } = await prepareConfiguration(request)
   if (errors.length) {
     return send(response, 400, { message: "Revisa los datos del formulario.", errors })
   }
@@ -306,7 +354,7 @@ async function handleGenerate(request, response) {
     }
 
     if (exists) await rm(target, { recursive: true, force: false })
-    await rename(temporaryDirectory, target)
+    await publishGeneratedDirectory(temporaryDirectory, target)
   } catch (error) {
     await rm(temporaryDirectory, { recursive: true, force: true })
     throw error
@@ -351,6 +399,9 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === "GET" && url.pathname === "/api/status") {
       return send(response, 200, await projectStatus())
+    }
+    if (request.method === "POST" && url.pathname === "/api/catalog") {
+      return await handleCatalogAnalysis(request, response)
     }
     if (request.method === "POST" && url.pathname === "/api/preview") {
       return await handlePreview(request, response)
