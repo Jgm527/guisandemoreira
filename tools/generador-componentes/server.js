@@ -18,6 +18,7 @@ import {
   describeProjectResources,
   inspectExistingResource,
 } from "./generador/recursos-proyecto.js"
+import { enrichRelations } from "./generador/entidades-proyecto.js"
 import { normalizarArchivo } from "./analizador/fuentes.js"
 import { analizarPantalla, resumenPantallas } from "./analizador/inventario.js"
 import { inventarioPublico } from "./analizador/publico.js"
@@ -208,7 +209,7 @@ async function projectStatus() {
   // aquí, se deriva de la biblioteca y se contrasta con src/api/.
   const resources = (await describeProjectResources(PROJECT_ROOT))
     .filter((resource) => resource.files.length)
-    .map(({ key, name, files, apiFile, apiExists, operations, missingFunctions, catalogOnly, hasStore, idField, usable }) => ({
+    .map(({ key, name, files, apiFile, apiExists, operations, missingFunctions, catalogOnly, hasStore, storeFile, idField, usable, relationOnly }) => ({
       key,
       name,
       files,
@@ -218,8 +219,10 @@ async function projectStatus() {
       missingFunctions,
       catalogOnly,
       hasStore,
+      storeFile,
       idField,
       usable,
+      relationOnly: Boolean(relationOnly),
     }))
 
   let outputs = []
@@ -269,8 +272,11 @@ async function handleCatalogAnalysis(request, response) {
 async function prepareConfiguration(request) {
   const input = await readJson(request)
   const { input: enriched, errors: catalogErrors } = await enrichCatalogs(PROJECT_ROOT, input)
-  const { errors } = validateConfiguration(enriched)
-  return { input: enriched, errors: [...catalogErrors, ...errors] }
+  // Las relaciones se completan con el store y la entidad reales de disco: solo
+  // se envía el nombre de la entidad y cómo se elige el registro.
+  const conRelaciones = await enrichRelations(PROJECT_ROOT, enriched)
+  const { errors } = validateConfiguration(conRelaciones)
+  return { input: conRelaciones, errors: [...catalogErrors, ...errors] }
 }
 
 async function handlePreview(request, response) {

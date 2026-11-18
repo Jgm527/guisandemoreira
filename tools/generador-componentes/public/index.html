@@ -167,7 +167,7 @@
             <button type="button" class="button button-secondary" id="add-relation">Añadir relación</button>
           </div>
           <div id="relations-list" class="fields-list" aria-live="polite"></div>
-          <p class="help-panel">El selector de la API usa la lista real del recurso (por ejemplo <code>getPacientes</code> de <code>src/api/pacientes.js</code>). El modo Pinia consume la selección compartida que establecen pantallas como XestionPacientes o XestionDoctores; Citas no tiene store, así que solo admite selector.</p>
+          <p class="help-panel">El selector de la API usa la lista real del recurso (por ejemplo <code>getPacientes</code> de <code>src/api/pacientes.js</code>). El modo Pinia consume la selección compartida que establecen pantallas como XestionPacientes o XestionDoctores y, en general, cualquier entidad que tenga su store en <code>src/store/</code>, incluidas las generadas antes con esta herramienta; si no hay store, solo queda el selector.</p>
 
           <div class="subsection-heading">
             <div>
@@ -357,9 +357,9 @@
           <label class="field"><span>Cómo se escoge el registro</span>
             <select data-property="selection">
               <option value="api">Selector con la lista de la API</option>
-              <option value="pinia">Selección compartida con Pinia (store existente)</option>
+              <option value="pinia">Selección compartida con Pinia (store de src/store)</option>
             </select>
-            <small data-property="selection-hint">El selector carga la lista real del recurso; el modo Pinia usa el store que ya existe en el proyecto.</small>
+            <small data-property="selection-hint">El selector carga la lista real del recurso; el modo Pinia lee la selección del store sin desplegable.</small>
           </label>
         </div>
         <div class="field-options">

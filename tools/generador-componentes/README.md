@@ -71,17 +71,26 @@ recurso falta, se detiene y lo explica.
 
 El tipo de pantalla **Relacionado** está disponible para entidades nuevas. En el
 paso 4 del formulario se declaran relaciones con pacientes, doctores o citas y,
-de forma independiente, si la pantalla comparte su propia selección con Pinia:
+de forma independiente, si la pantalla comparte su propia selección con Pinia.
+También se puede relacionar una entidad que se generó antes con esta misma
+herramienta: se detecta por su modelo en `backend/modelos`, su módulo en
+`src/api/` y, si lo tiene, su store en `src/store/`.
 
 - Cada relación genera un campo en el modelo y una llamada a
   `validarRelaciones()` en el router. La relación
   con pacientes es la excepción: guarda su DNI como texto y valida
   `Paciente.exists({ dnipac })`, siguiendo `backend/modelos/Cita.js`; doctores y
   citas siguen usando `ObjectId`/`ref`.
-- Cada relación se escoge con un **selector de la API** (lista real del recurso)
-  o con la **selección compartida** de un store que ya existe en el proyecto
-  (`pacienteStore` y `doctorStore`; Citas no tiene store, así que solo admite
-  selector).
+- Cada relación se escoge de una de las dos formas, y se elige por relación en
+  la app (paso 4) y en la terminal:
+  - **Selector con la lista de la API**: carga todos los registros del recurso y
+    se guarda el que se marque.
+  - **Selección compartida con Pinia**: no hay desplegable; el componente lee la
+    selección que dejó otra pantalla en `src/store/`, como hace `Citas.vue` con
+    `pacienteStore.dnipac` y `doctorStore.idDoctor`. Se ofrece para cualquier
+    entidad que tenga su store en `src/store/`, incluidas las generadas antes
+    con su propio store. Si no existe el archivo, el selector es la única
+    opción y el aviso dice qué `src/store/<entidad>Store.js` falta.
 - Si el listado se marca como filtrable, el router y el módulo de API admiten
   un parámetro con el nombre del campo configurado, por ejemplo
   `?pacienteDNI=...` para una relación con pacientes.

@@ -280,7 +280,7 @@ function fillSelect(select, options, value, fallback = "") {
 function fillExistingResourceOptions() {
   const select = form.elements.namedItem("existingResource")
   if (!select) return
-  const options = projectResources.filter((resource) => resource.usable)
+  const options = projectResources.filter((resource) => resource.usable && !resource.relationOnly)
   if (!options.length) {
     select.replaceChildren(new Option("No hay recursos completos en el proyecto; revisa el aviso de la cabecera", ""))
     return
@@ -504,11 +504,15 @@ function addRelation(relation = {}) {
   function updateSelectionHint() {
     const info = projectResources.find((resource) => resource.key === resourceControl.value)
     if (info && !info.hasStore && selectionControl.value === "pinia") {
-      hint.textContent = `${info.name} no tiene store de Pinia en este proyecto: elige el selector de la API.`
+      hint.textContent = `${info.name} no tiene store de Pinia en este proyecto: elige el selector de la API, o crea src/store/${info.key}Store.js.`
+    } else if (info?.hasStore && selectionControl.value === "pinia") {
+      hint.textContent = `Sin desplegable: el formulario leerá la selección compartida de src/store/${info.storeFile} (patrón de Citas.vue).`
     } else if (selectionControl.value === "pinia") {
-      hint.textContent = "El formulario enviará la selección que comparten pantallas como XestionPacientes o XestionDoctores (patrón de Citas.vue)."
+      hint.textContent = "El formulario leerá la selección compartida del store en lugar de cargar un desplegable."
     } else {
-      hint.textContent = "El selector carga la lista real del recurso; el modo Pinia usa el store que ya existe en el proyecto."
+      hint.textContent = info?.hasStore
+        ? `El selector carga la lista real del recurso; el modo Pinia usaría ${info.storeFile}.`
+        : "El selector carga la lista real del recurso; el modo Pinia usa el store que ya existe en el proyecto."
     }
   }
 

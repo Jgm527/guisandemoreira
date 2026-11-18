@@ -1,4 +1,5 @@
 import { RESOURCE_LIBRARY, escapeHtml, js, singularPluralName, slugify } from "../datos.js"
+import { relacionMeta } from "../relaciones.js"
 import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
 
 const pascalCase = (value) => {
@@ -98,9 +99,11 @@ export function generateComponent(config) {
   // la variable local que usará el componente.
   const storeVars = new Map()
   for (const relation of piniaRelations) {
-    const library = RESOURCE_LIBRARY[relation.resource]
-    const variable = library.store.importName.replace(/^use/, "").replace(/^([A-Z])/, (letter) => letter.toLowerCase())
-    storeVars.set(relation.fieldName, { library, store: library.store, variable })
+    // La metadata sale de la biblioteca curada o de la entidad descubierta en
+    // el proyecto; en ambos casos el store trae su archivo y sus propiedades.
+    const meta = relacionMeta(relation)
+    const variable = meta.store.importName.replace(/^use/, "").replace(/^([A-Z])/, (letter) => letter.toLowerCase())
+    storeVars.set(relation.fieldName, { meta, store: meta.store, variable })
   }
   const ownStore = config.pinia.enabled
     ? {
@@ -186,7 +189,7 @@ export function generateComponent(config) {
     // recurso; «pinia» muestra la selección compartida. El valor enviado depende
     // del identificador del recurso (por ejemplo, pacienteStore.dnipac).
     const relationFormControl = (relation) => {
-      const meta = RESOURCE_LIBRARY[relation.resource]
+      const meta = relacionMeta(relation)
       const singularLabel = meta.singularWord
       const pascal = relation.fieldName[0].toUpperCase() + relation.fieldName.slice(1)
       if (relation.selection === "api") {
@@ -286,7 +289,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
 
   const relatedApiImports = []
   for (const relation of apiRelations) {
-    const meta = RESOURCE_LIBRARY[relation.resource]
+    const meta = relacionMeta(relation)
     const listFunction = meta.apiFunctions.list
     let group = relatedApiImports.find((entry) => entry.module === `../api/${meta.apiFile}`)
     if (!group) {
@@ -319,10 +322,10 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     `import { ${alertImports.join(", ")} } from "../utils/alertas.js";`,
     "",
   ]
-  for (const { library, variable } of storeVars.values()) {
+  for (const { meta, store, variable } of storeVars.values()) {
     script.push(
-      `// Acceso al store real del proyecto: guarda la selección de ${library.label.toLowerCase()} entre pantallas.`,
-      `const ${variable} = ${library.store.importName}();`,
+      `// Acceso al store real del proyecto: guarda la selección de ${meta.label.toLowerCase()} entre pantallas.`,
+      `const ${variable} = ${store.importName}();`,
       "",
     )
   }
@@ -366,7 +369,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
     )
     for (const relation of apiRelations) {
       const pascal = pascalName(relation.fieldName)
-      const meta = RESOURCE_LIBRARY[relation.resource]
+      const meta = relacionMeta(relation)
       script.push(
         `// Etiqueta visible de un registro de ${meta.label.toLowerCase()} en el selector y la tabla.`,
         `function etiqueta${pascal}(item) {`,
@@ -406,13 +409,13 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
   if (piniaRelations.length) {
     for (const relation of piniaRelations) {
       const pascal = pascalName(relation.fieldName)
-      const { library, store, variable } = storeVars.get(relation.fieldName)
+      const { meta, variable } = storeVars.get(relation.fieldName)
       script.push(
         `// Sin lista cargada, resuelve la etiqueta con los datos del store compartido.`,
         `function texto${pascal}(id) {`,
         '  const valor = String(id ?? "");',
         '  if (!valor) return "—";',
-        `  const desdeStore = ${js(library.displayFields)}`,
+        `  const desdeStore = ${js(meta.displayFields)}`,
         `    .map((campo) => ${variable}[campo])`,
         "    .filter(Boolean)",
         '    .join(" ");',
@@ -560,7 +563,7 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
       "async function cargarRelaciones() {",
       ...apiRelations.map((relation) => {
         const pascal = pascalName(relation.fieldName)
-        const meta = RESOURCE_LIBRARY[relation.resource]
+        const meta = relacionMeta(relation)
         return [
           "  try {",
           `    relacion${pascal}.value = await ${meta.apiFunctions.list}();`,

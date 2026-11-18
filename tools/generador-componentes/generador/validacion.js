@@ -13,7 +13,12 @@ import {
   matchesPattern,
   parseOptions,
   parsePattern,
+  slugify,
 } from "./datos.js"
+import { relacionMeta } from "./relaciones.js"
+
+const IDENTIFIER = /^[a-z][A-Za-z0-9]*$/
+const FUNCTION_NAME = /^[A-Za-z_$][\w$]*$/
 
 function normalizeCatalog(input) {
   const catalog = input && typeof input === "object" && !Array.isArray(input) ? input : {}
@@ -206,13 +211,72 @@ function validateCatalogGroup(fields, errors) {
   }
 }
 
+// Descriptor del store de Pinia que la relación va a importar. Solo se acepta
+// lo que tiene forma segura: un archivo .js de src/store/, un export válido y
+// dos propiedades del estado con nombre de identificador.
+function normalizeStoreDescriptor(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null
+  // Solo el nombre del archivo dentro de src/store/: cualquier ruta ("../") se
+  // rechaza en lugar de recortarse, para que la generación no escriba imports
+  // fuera de esa carpeta.
+  const file = String(input.file ?? "").trim()
+  const importName = String(input.importName ?? "").trim()
+  const idProp = String(input.idProp ?? "").trim()
+  const relationValueProp = String(input.relationValueProp ?? "").trim() || idProp
+  if (!/^[A-Za-z][A-Za-z0-9_-]*\.js$/.test(file)) return null
+  if (!FUNCTION_NAME.test(importName) || !IDENTIFIER.test(idProp) || !IDENTIFIER.test(relationValueProp)) return null
+  const seleccionar = String(input.seleccionar ?? "").trim()
+  const limpiar = String(input.limpiar ?? "").trim()
+  return {
+    file,
+    importName,
+    storeId: String(input.storeId ?? "").trim(),
+    idProp,
+    relationValueProp,
+    seleccionar: FUNCTION_NAME.test(seleccionar) ? seleccionar : "",
+    limpiar: FUNCTION_NAME.test(limpiar) ? limpiar : "",
+  }
+}
+
+// Descriptor de una entidad descubierta en el proyecto (por ejemplo, una
+// generada antes): lo que las plantillas necesitan para el modelo, el router y
+// el selector del formulario.
+function normalizeRelationEntity(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null
+  const displayFields = Array.isArray(input.displayFields)
+    ? [...new Set(input.displayFields.map((name) => String(name).trim()).filter((name) => IDENTIFIER.test(name)))].slice(0, 4)
+    : []
+  const list = String(input.apiFunctions?.list ?? "").trim()
+  const apiFile = String(input.apiFile ?? "").replaceAll("\\", "/").split("/").pop().trim()
+  return {
+    label: String(input.label ?? "").trim(),
+    singularWord: String(input.singularWord ?? "").trim(),
+    refModel: String(input.refModel ?? "").trim(),
+    relationIdField: String(input.relationIdField ?? "").trim(),
+    idField: String(input.idField ?? "_id").trim() || "_id",
+    apiFile: /^[a-z][a-z0-9]*\.js$/.test(apiFile) ? apiFile : "",
+    apiPath: String(input.apiPath ?? "").trim(),
+    displayFields,
+    apiFunctions: FUNCTION_NAME.test(list) ? { list } : {},
+    referenceFiles: Array.isArray(input.referenceFiles)
+      ? input.referenceFiles.map((file) => String(file).replaceAll("\\", "/").trim()).filter(Boolean)
+      : [],
+    catalogOnly: Boolean(input.catalogOnly),
+    store: normalizeStoreDescriptor(input.store),
+  }
+}
+
 function normalizeRelation(relation) {
+  const entity = normalizeRelationEntity(relation.entity)
+  const store = normalizeStoreDescriptor(relation.store) ?? entity?.store ?? null
   return {
     resource: String(relation.resource ?? "").trim(),
     fieldName: String(relation.fieldName ?? "").trim(),
     label: String(relation.label ?? "").trim(),
     required: Boolean(relation.required),
     selection: String(relation.selection ?? "api").trim() || "api",
+    ...(store ? { store } : {}),
+    ...(entity ? { entity } : {}),
   }
 }
 
@@ -362,10 +426,18 @@ export function validateConfiguration(input) {
   for (const [index, relation] of relations.entries()) {
     const prefix = `Relación ${index + 1}`
     const relationMeta = RESOURCE_LIBRARY[relation.resource]
-    if (!relationMeta) {
-      errors.push(`${prefix}: elige una entidad relacionada conocida del proyecto (pacientes, doctores o citas).`)
-    } else if (relationMeta.catalogOnly) {
-      errors.push(`${prefix}: ${relationMeta.label} es un catálogo de solo lectura y no guarda documentos en MongoDB, así que no puede referenciarse con ObjectId. Usa un campo selector con opciones fijas si solo necesitas etiquetas.`)
+    const meta = relacionMeta(relation)
+    const displayLabel = meta?.label ?? relation.resource
+    if (!relationMeta && !relation.entity) {
+      errors.push(`${prefix}: elige una entidad relacionada conocida del proyecto o una entidad generada antes que tenga modelo en backend/modelos y módulo en src/api.`)
+    } else if (meta?.catalogOnly) {
+      errors.push(`${prefix}: ${displayLabel} es un catálogo de solo lectura y no guarda documentos en MongoDB, así que no puede referenciarse con ObjectId. Usa un campo selector con opciones fijas si solo necesitas etiquetas.`)
+    } else if (relation.entity) {
+      if (!isValidPascalCase(relation.entity.refModel)) {
+        errors.push(`${prefix}: ${displayLabel} no tiene un modelo válido en backend/modelos; revisa el archivo del modelo antes de generar.`)
+      } else if (!relation.entity.apiFunctions.list) {
+        errors.push(`${prefix}: ${displayLabel} no exporta una función de listado en su módulo de src/api/; sin ella no se puede rellenar el selector.`)
+      }
     }
     if (!isValidIdentifier(relation.fieldName) || relation.fieldName.length > 40) {
       errors.push(`${prefix}: el campo que guarda la relación debe empezar en minúscula y usar solo letras y números (por ejemplo, pacienteDNI).`)
@@ -379,8 +451,9 @@ export function validateConfiguration(input) {
     if (!RELATION_SELECTIONS.has(relation.selection)) {
       errors.push(`${prefix}: el modo de escoger el registro debe ser un selector de la API o la selección compartida de un store Pinia.`)
     }
-    if (relationMeta && relation.selection === "pinia" && !relationMeta.store) {
-      errors.push(`${prefix}: ${relationMeta.label} no tiene un store de Pinia en este proyecto; elige el modo selector de la API.`)
+    if (meta && relation.selection === "pinia" && !meta.store) {
+      const expectedStore = `src/store/${slugify(meta.refModel || relation.resource)}Store.js`
+      errors.push(`${prefix}: ${displayLabel} no tiene un store de Pinia en este proyecto; no existe ${expectedStore}. Crea ese store (o genera la pantalla con «compartir la selección»), o elige el modo selector de la API.`)
     }
   }
 

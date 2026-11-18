@@ -8,6 +8,7 @@ import path from "node:path"
 import { RESOURCE_LIBRARY } from "./datos.js"
 import { extractExportedFunctions } from "./catalogos.js"
 import { fileExists } from "./catalogos-proyecto.js"
+import { describeStore, discoverProjectEntities, listProjectStores, storeEntryFor } from "./entidades-proyecto.js"
 
 const API_DIRECTORY = "src/api"
 
@@ -80,12 +81,17 @@ export function proposeApiFunctions(functions) {
 // Estado de los recursos del proyecto: qué archivos existen, qué módulo de API
 // hay, qué funciones exporta y cuáles del mapa curado no aparecen en disco.
 export async function describeProjectResources(projectRoot) {
+  const stores = await listProjectStores(projectRoot)
   const resources = []
   for (const reference of resourceEntries()) {
     const files = []
     for (const relativePath of reference.files) {
       if (await fileExists(path.resolve(projectRoot, relativePath))) files.push(relativePath)
     }
+    const store = describeStore(
+      storeEntryFor(stores, { key: reference.key, singular: RESOURCE_LIBRARY[reference.key].singular }),
+      reference.idField,
+    )
     const api = await describeResourceApi(projectRoot, reference.key)
     const exported = new Set(api.functions.map((entry) => entry.name))
     const apiFunctions = RESOURCE_LIBRARY[reference.key].apiFunctions ?? {}
@@ -102,14 +108,22 @@ export async function describeProjectResources(projectRoot) {
       missingFunctions,
       operations: Object.keys(apiFunctions).filter((operation) => exported.has(apiFunctions[operation])),
       catalogOnly: reference.catalogOnly,
-      hasStore: reference.hasStore,
+      // El modo Pinia depende del store real de src/store/, no de una lista
+      // fija: si el archivo existe, la entidad puede compartir la selección.
+      hasStore: Boolean(store),
+      storeFile: store?.file ?? "",
+      store,
+      relationOnly: false,
       idField: reference.idField,
       // Solo se ofrece en el formulario lo que se puede generar sin sorpresas:
       // módulo de API, todos los archivos de referencia y sus funciones.
       usable: api.exists && files.length === reference.files.length && missingFunctions.length === 0,
     })
   }
-  return resources
+  // Entidades que la herramienta generó antes (o cualquiera con la misma
+  // estructura): solo sirven como destino de una relación, no para reutilizar
+  // su pantalla completa.
+  return resources.concat(await discoverProjectEntities(projectRoot))
 }
 
 // Comprueba que un recurso reutilizado está completo: archivos de referencia,

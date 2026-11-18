@@ -1,4 +1,5 @@
-import { RESOURCE_LIBRARY, slugify } from "./generador/datos.js"
+import { slugify } from "./generador/datos.js"
+import { relacionMeta } from "./generador/relaciones.js"
 import { collectCatalogs } from "./generador/catalogos.js"
 import { validateConfiguration } from "./generador/validacion.js"
 import {
@@ -73,7 +74,7 @@ export function catalogRequiredFiles(config) {
 export function relationRequiredFiles(config) {
   const required = []
   for (const relation of config.relations ?? []) {
-    const meta = RESOURCE_LIBRARY[relation.resource]
+    const meta = relacionMeta(relation)
     if (!meta || meta.catalogOnly) continue
     required.push(...meta.referenceFiles)
     if (relation.selection === "pinia" && meta.store) {

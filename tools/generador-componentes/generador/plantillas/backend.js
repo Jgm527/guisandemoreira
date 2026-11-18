@@ -1,4 +1,5 @@
-import { RESOURCE_LIBRARY, js, singularPluralName, slugify } from "../datos.js"
+import { js, singularPluralName, slugify } from "../datos.js"
+import { relacionMeta } from "../relaciones.js"
 import { catalogApiFunctionName, propertyAccess } from "../catalogos.js"
 
 function mongooseField(field) {
@@ -81,7 +82,7 @@ function mongooseField(field) {
 }
 
 function mongooseRelationField(relation) {
-  const meta = RESOURCE_LIBRARY[relation.resource]
+  const meta = relacionMeta(relation)
   if (meta.relationIdField) {
     const properties = ["type: String", "trim: true"]
     if (relation.required) properties.push("required: true")
@@ -129,7 +130,7 @@ export function generateRoutes(config) {
   const operations = new Set(config.operations)
   const relations = config.relations
   const bodyOperations = operations.has("create") || operations.has("edit")
-  const relatedModels = [...new Set(relations.map((relation) => RESOURCE_LIBRARY[relation.resource].refModel))]
+  const relatedModels = [...new Set(relations.map((relation) => relacionMeta(relation).refModel))]
   const imports = [
     "import express from \"express\";",
     `import ${singular} from "../modelos/${singular}.js";`,
@@ -170,7 +171,7 @@ export function generateRoutes(config) {
       `// cadena vacía cuando todas son válidas (mismo patrón que citas.rutas.js).`,
       "async function validarRelaciones(datos) {",
       ...relations.map((relation) => {
-        const meta = RESOURCE_LIBRARY[relation.resource]
+        const meta = relacionMeta(relation)
         if (meta.relationIdField) {
           return [
             `  if (datos.${relation.fieldName}) {`,
@@ -184,7 +185,7 @@ export function generateRoutes(config) {
         const model = meta.refModel
         return [
           `  if (datos.${relation.fieldName} && !(await ${model}.exists({ _id: datos.${relation.fieldName} }))) {`,
-          `    return "El ${RESOURCE_LIBRARY[relation.resource].singularWord} seleccionado no existe";`,
+          `    return "El ${meta.singularWord} seleccionado no existe";`,
           "  }",
         ].join("\n")
       }),

@@ -1,4 +1,5 @@
 import { RESOURCE_LIBRARY, escapeHtml, slugify } from "../datos.js"
+import { relacionMeta } from "../relaciones.js"
 import { catalogApiFunctionName, catalogRoutePath, collectCatalogs } from "../catalogos.js"
 
 const OPERATION_LABELS = { list: "listar", create: "crear", edit: "editar", delete: "borrar" }
@@ -159,7 +160,7 @@ function relationsSection(config) {
   const relations = config.relations ?? []
   if (!relations.length) return ""
   const rows = relations.map((relation) => {
-    const meta = RESOURCE_LIBRARY[relation.resource]
+    const meta = relacionMeta(relation)
     const validation = meta.relationIdField
       ? `\`${meta.refModel}.exists({ ${meta.relationIdField}: ... })\``
       : `\`${meta.refModel}.exists({ _id: ... })\``

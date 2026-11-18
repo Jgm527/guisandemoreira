@@ -14,6 +14,7 @@ import {
   listProjectCatalogFiles,
 } from "./generador/catalogos-proyecto.js"
 import { describeProjectResources, inspectExistingResource } from "./generador/recursos-proyecto.js"
+import { enrichRelations } from "./generador/entidades-proyecto.js"
 import { TEXT_PATTERN_PRESETS } from "./public/modules/restricciones.js"
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url))
@@ -416,17 +417,21 @@ async function askRelation(index, prompts, output, relationResources) {
   const { ask, choose, confirm } = prompts
   const resources = relationResources.map((resource) => ({ value: resource.key, label: resource.name }))
   writeLine(output, `\n--- Relación ${index + 1} ---`)
-  const resource = await choose("Entidad relacionada", resources, resources[0].value)
-  const meta = RESOURCE_LIBRARY[resource]
+  const resourceKey = await choose("Entidad relacionada", resources, resources[0].value)
+  const resource = relationResources.find((item) => item.key === resourceKey)
   const fieldName = await ask("Nombre del campo de relación", index === 0 ? "paciente" : `relacion${index + 1}`)
-  const label = await ask("Etiqueta visible", meta.singular)
+  const label = await ask("Etiqueta visible", resource.singular ?? resource.name)
+  // El modo Pinia se ofrece cuando el store existe de verdad en src/store/,
+  // también para entidades generadas antes con su propio store.
   const selections = [
-    { value: "api", label: "Selector con la API" },
-    ...(meta.store ? [{ value: "pinia", label: "Selección compartida con Pinia" }] : []),
+    { value: "api", label: "Selector con la lista de la API" },
+    ...(resource.hasStore
+      ? [{ value: "pinia", label: `Selección compartida con Pinia (${resource.storeFile})` }]
+      : []),
   ]
   const selection = await choose("Cómo se elige el registro", selections, "api")
   const required = await confirm("¿La relación es obligatoria?", false)
-  return { resource, fieldName, label, selection, required }
+  return { resource: resourceKey, fieldName, label, selection, required }
 }
 
 async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJECT_ROOT) {
@@ -454,10 +459,16 @@ async function collectConfiguration(prompts, output, projectRoot = DEFAULT_PROJE
         "No hay recursos completos en el proyecto para reutilizar: revisa src/api/ y los archivos de cada recurso, o elige una entidad nueva.",
       )
     }
+    // Las entidades descubiertas solo sirven como destino de relación; para
+    // reutilizar una pantalla completa se usan los recursos curados.
+    const reusable = projectResources.filter((resource) => !resource.relationOnly)
+    if (!reusable.length) {
+      throw new Error("No hay recursos completos del proyecto para reutilizar: revisa src/api/ o elige una entidad nueva.")
+    }
     existingResource = await choose(
       "Recurso del proyecto",
-      projectResources.map((resource) => ({ value: resource.key, label: resource.name })),
-      projectResources[0].key,
+      reusable.map((resource) => ({ value: resource.key, label: resource.name })),
+      reusable[0].key,
     )
   }
   const screen = {
@@ -718,7 +729,10 @@ export async function runTerminal({
           // Los catálogos se completan con la estructura real de sus archivos,
           // igual que hace el servidor web antes de validar.
           const { input: enriched, errors: catalogErrors } = await enrichCatalogs(projectRoot, inputConfig)
-          const result = validateConfiguration(enriched)
+          // Igual que la web: las relaciones se completan con el store y la
+          // entidad que existen de verdad en el proyecto.
+          const conRelaciones = await enrichRelations(projectRoot, enriched)
+          const result = validateConfiguration(conRelaciones)
           const validationErrors = [...catalogErrors, ...result.errors]
           if (!validationErrors.length) {
             config = result.config
