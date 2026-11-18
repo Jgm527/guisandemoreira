@@ -8,7 +8,7 @@ import {
   isValidDate,
   isValidIdentifier,
   isValidPascalCase,
-  js,
+  isValidTime,
   matchesPattern,
   parseOptions,
   parsePattern,
@@ -19,7 +19,9 @@ function normalizeField(field) {
   const options = parseOptions(field.options)
   const min = field.min === "" || field.min == null ? null : String(field.min).trim()
   const max = field.max === "" || field.max == null ? null : String(field.max).trim()
+  const step = field.step === "" || field.step == null ? null : String(field.step).trim()
   const { pattern, patternFlags } = parsePattern(field.pattern)
+  const patternMessage = String(field.patternMessage ?? "").trim()
   return {
     name: String(field.name ?? "").trim(),
     label: String(field.label ?? "").trim(),
@@ -28,8 +30,10 @@ function normalizeField(field) {
     defaultValue: field.defaultValue == null ? "" : String(field.defaultValue),
     min,
     max,
+    step,
     pattern,
     patternFlags,
+    patternMessage,
     options,
     form: field.form !== false,
     list: Boolean(field.list),
@@ -260,46 +264,61 @@ export function validateConfiguration(input) {
       errors.push(`${prefix}: solo los campos selector y radio admiten opciones.`)
     }
 
-    if (field.min !== null && field.max !== null) {
-      const minimum = field.type === "date" ? field.min : Number(field.min)
-      const maximum = field.type === "date" ? field.max : Number(field.max)
-      if ((field.type === "date" && (!isValidDate(minimum) || !isValidDate(maximum))) ||
-          (field.type !== "date" && (Number.isNaN(minimum) || Number.isNaN(maximum))) ||
-          minimum > maximum) {
-        errors.push(`${prefix}: el mínimo no puede ser mayor que el máximo y ambos valores deben ser válidos.`)
-      }
-    }
-    if (field.type === "date") {
-      for (const limit of [field.min, field.max]) {
-        if (limit !== null && !isValidDate(limit)) {
-          errors.push(`${prefix}: los límites de fecha deben tener formato YYYY-MM-DD y ser fechas válidas.`)
-          break
-        }
-      }
-      if (["text", "textarea", "email", "phone"].includes(field.type)) {
-        for (const limit of [field.min, field.max]) {
-          if (limit !== null && (!Number.isInteger(Number(limit)) || Number(limit) < 0)) {
-            errors.push(`${prefix}: los límites de longitud deben ser números enteros iguales o mayores que cero.`)
-            break
-          }
-        }
-      }
-    }
+    const lengthTypes = ["text", "textarea", "email", "phone"]
+    const rangeKind = lengthTypes.includes(field.type) ? "length"
+      : ["number", "date", "time"].includes(field.type) ? field.type : ""
+    const hasRange = field.min !== null || field.max !== null
     if ((field.min !== null || field.max !== null) &&
-        !["text", "textarea", "email", "phone", "number", "date"].includes(field.type)) {
-      errors.push(`${prefix}: min/max solo se admite para texto, correo, teléfono, número y fecha.`)
+        !rangeKind) {
+      errors.push(`${prefix}: los límites solo se admiten para texto, correo, teléfono, número, fecha y hora.`)
     }
-    if (field.type === "number") {
-      for (const limit of [field.min, field.max]) {
-        if (limit !== null && !Number.isFinite(Number(limit))) {
-          errors.push(`${prefix}: los límites de un campo numérico deben ser números válidos.`)
-          break
-        }
+    let validRange = Boolean(rangeKind)
+    for (const limit of [field.min, field.max]) {
+      if (limit === null) continue
+      if (rangeKind === "length" && (!Number.isInteger(Number(limit)) || Number(limit) < 0)) {
+        errors.push(`${prefix}: los límites de longitud deben ser números enteros iguales o mayores que cero.`)
+        validRange = false
+        break
       }
+      if (rangeKind === "number" && !Number.isFinite(Number(limit))) {
+        errors.push(`${prefix}: los límites de un campo numérico deben ser números válidos.`)
+        validRange = false
+        break
+      }
+      if (rangeKind === "date" && !isValidDate(limit)) {
+        errors.push(`${prefix}: los límites de fecha deben tener formato YYYY-MM-DD y ser fechas válidas.`)
+        validRange = false
+        break
+      }
+      if (rangeKind === "time" && !isValidTime(limit)) {
+        errors.push(`${prefix}: los límites de hora deben tener formato HH:MM y ser válidos.`)
+        validRange = false
+        break
+      }
+    }
+    if (hasRange && validRange && field.min !== null && field.max !== null) {
+      const minimum = rangeKind === "length" || rangeKind === "number" ? Number(field.min) : field.min
+      const maximum = rangeKind === "length" || rangeKind === "number" ? Number(field.max) : field.max
+      if (minimum > maximum) {
+        errors.push(`${prefix}: el mínimo no puede ser mayor que el máximo.`)
+      }
+    }
+    if (field.step !== null && field.type !== "number") {
+      errors.push(`${prefix}: el incremento solo se admite para campos numéricos.`)
+    }
+    if (field.step !== null && field.type === "number" &&
+        (!Number.isFinite(Number(field.step)) || Number(field.step) <= 0)) {
+      errors.push(`${prefix}: el incremento numérico debe ser un número mayor que cero.`)
+    }
+    if (field.patternMessage && !field.pattern) {
+      errors.push(`${prefix}: escribe una expresión regular antes de personalizar su mensaje.`)
+    }
+    if (field.patternMessage.length > 160) {
+      errors.push(`${prefix}: el mensaje de validación no puede superar 160 caracteres.`)
     }
     if (field.pattern) {
-      if (["boolean", "radio", "select"].includes(field.type)) {
-        errors.push(`${prefix}: la expresión regular no se aplica a booleanos, radios ni selectores.`)
+      if (!["text", "textarea", "email", "phone"].includes(field.type)) {
+        errors.push(`${prefix}: la expresión regular solo se aplica a texto, texto largo, correo y teléfono; usa las restricciones propias para número, fecha y hora.`)
       }
       try {
         new RegExp(field.pattern, field.patternFlags)
@@ -324,14 +343,22 @@ export function validateConfiguration(input) {
         const value = Number(field.defaultValue)
         if (field.min !== null && value < Number(field.min)) errors.push(`${prefix}: el valor inicial es menor que el mínimo.`)
         if (field.max !== null && value > Number(field.max)) errors.push(`${prefix}: el valor inicial es mayor que el máximo.`)
+        if (field.step !== null && Number.isFinite(Number(field.step))) {
+          const base = field.min === null ? 0 : Number(field.min)
+          const steps = (value - base) / Number(field.step)
+          if (Math.abs(steps - Math.round(steps)) > 1e-8) {
+            errors.push(`${prefix}: el valor inicial no coincide con el incremento configurado.`)
+          }
+        }
       } else if (field.type === "date") {
         if (!isValidDate(field.defaultValue)) errors.push(`${prefix}: el valor inicial debe ser una fecha válida con formato YYYY-MM-DD.`)
         if (field.min !== null && field.defaultValue < field.min) errors.push(`${prefix}: el valor inicial es anterior a la fecha mínima.`)
         if (field.max !== null && field.defaultValue > field.max) errors.push(`${prefix}: el valor inicial supera la fecha máxima.`)
-      } else if (field.type === "time" &&
-                 !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(field.defaultValue)) {
-        errors.push(`${prefix}: el valor inicial de hora debe tener formato HH:MM.`)
-      } else if (["text", "textarea", "email", "phone"].includes(field.type)) {
+      } else if (field.type === "time") {
+        if (!isValidTime(field.defaultValue)) errors.push(`${prefix}: el valor inicial de hora debe tener formato HH:MM.`)
+        if (field.min !== null && field.defaultValue < field.min) errors.push(`${prefix}: el valor inicial es anterior a la hora mínima.`)
+        if (field.max !== null && field.defaultValue > field.max) errors.push(`${prefix}: el valor inicial supera la hora máxima.`)
+      } else if (lengthTypes.includes(field.type)) {
         if (field.min !== null && field.defaultValue.length < Number(field.min)) {
           errors.push(`${prefix}: el valor inicial no alcanza la longitud mínima.`)
         }

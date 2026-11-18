@@ -8,6 +8,15 @@ function mongooseField(field) {
   if (field.type === "number") {
     if (field.min !== null) properties.push(`min: ${Number(field.min)}`)
     if (field.max !== null) properties.push(`max: ${Number(field.max)}`)
+    if (field.step !== null) {
+      const step = Number(field.step)
+      const base = field.min === null ? 0 : Number(field.min)
+      validators.push(`{ validator: (value) => {
+        if (value == null || value === "") return true;
+        const steps = (value - ${base}) / ${step};
+        return Number.isFinite(value) && Math.abs(steps - Math.round(steps)) < 1e-8;
+      }, message: "El número no respeta el incremento permitido" }`)
+    }
   } else {
     if (["text", "textarea", "email", "phone"].includes(field.type)) properties.push("trim: true")
     if (field.type === "date") {
@@ -23,17 +32,21 @@ function mongooseField(field) {
           && (${max} === null || value <= ${max});
       }, message: "La fecha no es válida o está fuera de los límites permitidos" }`)
     } else if (field.type === "time") {
-      validators.push('{ validator: (value) => value == null || value === "" || /^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(value), message: "La hora debe tener formato HH:MM" }')
+      const min = field.min === null ? "null" : js(field.min)
+      const max = field.max === null ? "null" : js(field.max)
+      validators.push(`{ validator: (value) => value == null || value === ""
+        || (/^(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(value)
+          && (${min} === null || value >= ${min})
+          && (${max} === null || value <= ${max})), message: "La hora no es válida o está fuera de los límites permitidos" }`)
     }
-    if (field.min !== null && field.type !== "date") {
+    if (field.min !== null && ["text", "textarea", "email", "phone"].includes(field.type)) {
       if (field.required) properties.push(`minlength: ${Number(field.min)}`)
       else {
         validators.push(`{ validator: (value) => value == null || value === "" || value.length >= ${Number(field.min)}, message: "El valor es demasiado corto" }`)
       }
     }
-    if (field.max !== null && field.type !== "date") {
-      if (field.type === "number") properties.push(`max: ${Number(field.max)}`)
-      else properties.push(`maxlength: ${Number(field.max)}`)
+    if (field.max !== null && ["text", "textarea", "email", "phone"].includes(field.type)) {
+      properties.push(`maxlength: ${Number(field.max)}`)
     }
   }
   const pattern = field.pattern || (field.type === "email" ? "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" : "")
@@ -43,7 +56,7 @@ function mongooseField(field) {
       if (value == null || value === "") return true;
       const match = new RegExp(${js(pattern)}, ${js(flags)}).exec(String(value));
       return match?.index === 0 && match[0].length === String(value).length;
-    }, message: "El formato no es válido" }`)
+    }, message: ${js(field.patternMessage || "El formato no es válido")} }`)
   }
   if (validators.length) properties.push(`validate: [${validators.join(", ")}]`)
   if (["select", "radio"].includes(field.type)) {

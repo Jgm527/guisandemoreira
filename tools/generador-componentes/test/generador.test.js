@@ -160,13 +160,13 @@ test("genera controles y validaciones para los tipos de campo admitidos", () => 
   assert.match(model, /value === ""/)
 })
 
-test("normaliza regex con barras y valida texto, textarea, número y fecha", () => {
+test("normaliza regex de texto y genera restricciones tipadas para número y fecha", () => {
   const config = validConfiguration()
   config.fields = [
     { name: "codigo", label: "Código", type: "text", required: true, defaultValue: "ABC", pattern: "/^[A-Z]{3}$/", form: true, list: true, search: false },
     { name: "detalle", label: "Detalle", type: "textarea", required: false, defaultValue: "", pattern: "/^[A-Z]{3}$/", form: true, list: true, search: false },
-    { name: "cantidad", label: "Cantidad", type: "number", required: true, defaultValue: "12", pattern: "/^\\d{2}$/", form: true, list: true, search: false },
-    { name: "fecha", label: "Fecha", type: "date", required: true, defaultValue: "2026-02-28", pattern: "/^\\d{4}-\\d{2}-\\d{2}$/", form: true, list: true, search: false },
+    { name: "cantidad", label: "Cantidad", type: "number", required: true, defaultValue: "12", min: "10", max: "99", form: true, list: true, search: false },
+    { name: "fecha", label: "Fecha", type: "date", required: true, defaultValue: "2026-02-28", min: "2026-01-01", max: "2026-12-31", form: true, list: true, search: false },
   ]
   config.operations = ["list", "create"]
 
@@ -177,11 +177,13 @@ test("normaliza regex con barras y valida texto, textarea, número y fecha", () 
 
   const model = generated.files["backend/modelos/Tarea.js"]
   assert.match(model, /new RegExp\("\^\[A-Z\]\{3\}\$", ""\)/)
-  assert.match(model, /cantidad: \{ type: Number, required: true, validate:/)
+  assert.match(model, /cantidad: \{ type: Number, required: true, min: 10, max: 99/)
+  assert.match(model, /value >= "2026-01-01"/)
   assert.doesNotMatch(model, /cantidad: \{[^}]*match:/)
 
   const component = generated.files["src/components/GestionTareas.vue"]
   assert.match(component, /type="text" required[^>]*pattern="\^\[A-Z\]\{3\}\$"/)
+  assert.match(component, /type="date" required min="2026-01-01" max="2026-12-31"/)
   assert.match(component, /<textarea[^>]*><\/textarea>/)
   assert.doesNotMatch(component, /<textarea[^>]*pattern=/)
   assert.doesNotMatch(component, /type="number"[^>]*pattern=/)
@@ -196,6 +198,15 @@ test("normaliza regex con barras y valida texto, textarea, número y fecha", () 
     id: "generator-regex-patterns",
   })
   assert.deepEqual(template.errors, [])
+})
+
+test("recomienda límites tipados para número y fecha en vez de expresiones regulares", () => {
+  const config = validConfiguration()
+  config.fields = [
+    { name: "fecha", label: "Fecha", type: "date", pattern: "^\\d{4}-\\d{2}-\\d{2}$", form: true, list: true },
+  ]
+  const { errors } = validateConfiguration(config)
+  assert.ok(errors.some((error) => error.includes("usa las restricciones propias para número, fecha y hora")))
 })
 
 test("compila los formularios cuando solo se solicita crear o editar", () => {
@@ -429,4 +440,72 @@ test("genera siempre la lista completa sin variables de búsqueda retiradas", ()
   assert.doesNotMatch(component, /searchTerm|config\.operations\.includes\("search"\)/)
   assert.match(generated.files["src/api/medicamentos.js"], /\/api\/medicamentos/)
   assert.match(generated.files["backend/rutas/medicamentos.rutas.js"], /Medicamento\.find\(\)\.lean\(\)/)
+})
+
+test("aplica restricciones por tipo en formulario, modelo y valores iniciales", () => {
+  const config = validConfiguration()
+  config.fields = [
+    {
+      name: "nombre",
+      label: "Nombre",
+      type: "text",
+      required: false,
+      defaultValue: "Ana",
+      min: "2",
+      max: "20",
+      pattern: "^[A-Za-z]+$",
+      patternMessage: "Usa solo letras",
+      options: "",
+      form: true,
+      list: true,
+      search: false,
+    },
+    {
+      name: "precio",
+      label: "Precio",
+      type: "number",
+      required: true,
+      defaultValue: "1.5",
+      min: "0.5",
+      max: "10",
+      step: "0.5",
+      options: "",
+      form: true,
+      list: false,
+      search: false,
+    },
+    {
+      name: "hora",
+      label: "Hora",
+      type: "time",
+      required: false,
+      defaultValue: "10:30",
+      min: "09:00",
+      max: "18:00",
+      options: "",
+      form: true,
+      list: false,
+      search: false,
+    },
+  ]
+  const { errors } = validateConfiguration(config)
+  assert.deepEqual(errors, [])
+  const generated = generateFiles(config).files
+  assert.match(generated["src/components/GestionTareas.vue"], /type="text"[^>]*minlength="2"[^>]*maxlength="20"/)
+  assert.match(generated["src/components/GestionTareas.vue"], /type="number"[^>]*min="0\.5"[^>]*max="10"[^>]*step="0\.5"/)
+  assert.match(generated["src/components/GestionTareas.vue"], /type="time"[^>]*min="09:00"[^>]*max="18:00"/)
+  assert.match(generated["src/components/GestionTareas.vue"], /Usa solo letras/)
+  assert.match(generated["backend/modelos/Tarea.js"], /value\.length >= 2/)
+  assert.match(generated["backend/modelos/Tarea.js"], /maxlength: 20/)
+  assert.match(generated["backend/modelos/Tarea.js"], /El número no respeta el incremento permitido/)
+  assert.match(generated["backend/modelos/Tarea.js"], /value >= "09:00"/)
+
+  config.fields[1].defaultValue = "1.6"
+  assert.ok(validateConfiguration(config).errors.some((error) => error.includes("incremento configurado")))
+  config.fields[1].defaultValue = "1.5"
+  config.fields[2].defaultValue = "08:59"
+  assert.ok(validateConfiguration(config).errors.some((error) => error.includes("hora mínima")))
+  config.fields[2].defaultValue = "10:30"
+  config.fields[2].max = "08:00"
+  assert.ok(validateConfiguration(config).errors.some((error) => error.includes("mínimo no puede ser mayor")))
 })

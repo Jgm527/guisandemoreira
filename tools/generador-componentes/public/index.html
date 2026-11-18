@@ -242,11 +242,31 @@
               <option value="time">Hora</option><option value="boolean">Booleano / checkbox</option>
               <option value="radio">Radio</option><option value="select">Selector fijo</option>
             </select>
+            <small data-hint-for="type">Las restricciones disponibles dependen del tipo de dato.</small>
           </label>
-          <label class="field"><span>Valor inicial (opcional)</span><input data-property="defaultValue" placeholder="Ej.: pendiente"></label>
-          <label class="field"><span>Mínimo (opcional)</span><input data-property="min" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
-          <label class="field"><span>Máximo (opcional)</span><input data-property="max" inputmode="decimal" placeholder="Longitud, número o fecha YYYY-MM-DD"></label>
-          <label class="field field-wide"><span>Expresión regular (opcional)</span><input data-property="pattern" placeholder="/^[A-Z]{3}$/"><small>Acepta el patrón directo o una expresión con barras como en JavaScript. Se valida en el formulario y en Mongoose para texto, número y fecha.</small></label>
+          <label class="field"><span>Valor inicial (opcional)</span><input data-property="defaultValue" placeholder="Ej.: pendiente"><small data-hint-for="defaultValue">Se comprobará también frente a las restricciones del campo.</small></label>
+          <label class="field" data-restriction="range"><span data-label-for="min">Longitud mínima (opcional)</span><input data-property="min" inputmode="decimal" placeholder="Ej.: 2"><small data-hint-for="min">Se aplica al tipo de dato seleccionado.</small></label>
+          <label class="field" data-restriction="range"><span data-label-for="max">Longitud máxima (opcional)</span><input data-property="max" inputmode="decimal" placeholder="Ej.: 80"><small data-hint-for="max">Se aplica al tipo de dato seleccionado.</small></label>
+          <label class="field" data-restriction="step"><span>Incremento permitido (opcional)</span><input data-property="step" type="number" min="0" step="any" placeholder="Ej.: 0.5"><small>Solo para números; por ejemplo, 0.5 permite 1, 1.5 y 2.</small></label>
+          <label class="field field-wide" data-restriction="pattern-preset"><span>Regla sencilla de texto (opcional)</span>
+            <select data-pattern-preset>
+              <option value="none">Sin regla adicional</option>
+              <option value="letters">Solo letras</option>
+              <option value="letters-spaces">Letras y espacios</option>
+              <option value="digits">Solo dígitos</option>
+              <option value="alphanumeric">Letras y números</option>
+              <option value="uppercase">Solo mayúsculas</option>
+              <option value="lowercase">Solo minúsculas</option>
+              <option value="custom">Escribir una regla avanzada…</option>
+            </select>
+            <small>Elige una regla sin escribir código. El correo ya comprueba automáticamente su formato.</small>
+          </label>
+          <details class="field-wide" data-restriction="pattern-advanced">
+            <summary>Regla avanzada (opcional)</summary>
+            <p class="advanced-hint">Solo hace falta si ninguna regla sencilla te sirve. Usa una expresión regular de JavaScript.</p>
+            <label class="field"><span>Expresión regular</span><input data-property="pattern" placeholder="Ej.: ^[A-Z]{3}$"><small>No escribas las barras externas. Ejemplo: ^[A-Z]{3}$ acepta tres letras mayúsculas.</small></label>
+          </details>
+          <label class="field field-wide" data-restriction="pattern-message" hidden><span>Mensaje si no cumple el formato (opcional)</span><input data-property="patternMessage" maxlength="160" placeholder="Ej.: Usa tres letras mayúsculas"><small>Se mostrará al rechazar el valor por la expresión regular.</small></label>
           <label class="field field-wide options-field" hidden><span>Opciones fijas</span><textarea data-property="options" rows="3" placeholder="pendiente|Pendiente&#10;completada|Completada"></textarea><small>Una opción por línea, con formato valor|etiqueta.</small></label>
         </div>
         <div class="field-options">

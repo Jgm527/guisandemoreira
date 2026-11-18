@@ -11,8 +11,10 @@ function fieldControl(field) {
   const id = `campo-${field.name}`
   const required = field.required ? " required" : ""
   const pattern = field.pattern || (field.type === "email" ? "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" : "")
-  const min = field.min === null ? "" : ` ${field.type === "number" || field.type === "date" ? "min" : "minlength"}="${escapeHtml(field.min)}"`
-  const max = field.max === null ? "" : ` ${field.type === "number" || field.type === "date" ? "max" : "maxlength"}="${escapeHtml(field.max)}"`
+  const nativeRangeType = ["number", "date", "time"].includes(field.type)
+  const min = field.min === null ? "" : ` ${nativeRangeType ? "min" : "minlength"}="${escapeHtml(field.min)}"`
+  const max = field.max === null ? "" : ` ${nativeRangeType ? "max" : "maxlength"}="${escapeHtml(field.max)}"`
+  const step = field.type === "number" ? ` step="${escapeHtml(field.step ?? "any")}"` : ""
   const nativePatternSupported = ["text", "email", "phone"].includes(field.type)
   const centered = ["phone", "number", "date", "time"].includes(field.type) ||
     /(?:id|dni|codigo|code|postal|zip)$/i.test(field.name)
@@ -54,7 +56,7 @@ ${field.options.map((option) => `          <option value="${escapeHtml(option.va
   const numberModifier = field.type === "number" ? ".number" : ["text", "email", "phone"].includes(field.type) ? ".trim" : ""
   return `      <div class="grid gap-2">
         <label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>
-        <input id="${id}" v-model${numberModifier}="registro.${field.name}" class="${inputClasses}" type="${inputType}"${required}${min}${max}${patternAttribute}>
+        <input id="${id}" v-model${numberModifier}="registro.${field.name}" class="${inputClasses}" type="${inputType}"${required}${min}${max}${step}${patternAttribute}>
       </div>`
 }
 
@@ -494,14 +496,14 @@ ${operations.has("delete") ? '              <button type="button" class="mx-1 ro
       ...(patternedFields.length ? [
         "  const campoConFormatoInvalido = [",
         ...patternedFields.map((field) =>
-          `    { etiqueta: ${js(field.label)}, valor: registro.${field.name}, patron: ${js(field.pattern)}, flags: ${js(field.patternFlags)} },`),
+          `    { etiqueta: ${js(field.label)}, valor: registro.${field.name}, patron: ${js(field.pattern)}, flags: ${js(field.patternFlags)}, mensaje: ${js(field.patternMessage || "no cumple el formato indicado")} },`),
         "  ].find(({ valor, patron, flags }) => {",
         "    if (valor == null || valor === \"\") return false;",
         "    const coincidencia = new RegExp(patron, flags).exec(String(valor));",
         "    return !coincidencia || coincidencia.index !== 0 || coincidencia[0].length !== String(valor).length;",
         "  });",
         "  if (campoConFormatoInvalido) {",
-        '    await alertaError(`El campo "${campoConFormatoInvalido.etiqueta}" no cumple el formato indicado.`, "Validación");',
+        '    await alertaError(`El campo "${campoConFormatoInvalido.etiqueta}" ${campoConFormatoInvalido.mensaje}.`, "Validación");',
         "    return;",
         "  }",
       ] : []),

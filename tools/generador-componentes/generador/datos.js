@@ -173,6 +173,10 @@ export function isValidDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
+export function isValidTime(value) {
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)
+}
+
 export function slugify(value) {
   return value
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")

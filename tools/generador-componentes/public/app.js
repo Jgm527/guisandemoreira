@@ -15,6 +15,15 @@ const validationMessage = document.querySelector("#validation-message")
 const generateButton = document.querySelector("#generate-button")
 let currentStep = 0
 let currentPreview = null
+const PATTERN_PRESETS = {
+  none: { pattern: "", message: "" },
+  letters: { pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$", message: "usa solo letras" },
+  "letters-spaces": { pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$", message: "usa solo letras y espacios" },
+  digits: { pattern: "^\\d+$", message: "usa solo dígitos" },
+  alphanumeric: { pattern: "^[A-Za-z0-9]+$", message: "usa solo letras y números" },
+  uppercase: { pattern: "^[A-Z]+$", message: "usa solo letras mayúsculas" },
+  lowercase: { pattern: "^[a-z]+$", message: "usa solo letras minúsculas" },
+}
 
 const ui = createUi(formConfig)
 const {
@@ -64,34 +73,129 @@ function addField(field = {}) {
   const typeControl = card.querySelector('[data-property="type"]')
   const optionsField = card.querySelector(".options-field")
   const title = card.querySelector("legend")
-  let previousType = typeControl.value
+  const patternControl = card.querySelector('[data-property="pattern"]')
+  const patternMessageControl = card.querySelector('[data-property="patternMessage"]')
+  const patternPresetControl = card.querySelector("[data-pattern-preset]")
+  const patternAdvanced = card.querySelector('[data-restriction="pattern-advanced"]')
+  const matchedPreset = Object.entries(PATTERN_PRESETS)
+    .find(([, preset]) => preset.pattern === patternControl.value)
+  patternPresetControl.value = matchedPreset ? matchedPreset[0] : patternControl.value ? "custom" : "none"
+  let previousRangeKind = ["text", "textarea", "email", "phone"].includes(typeControl.value)
+    ? "length"
+    : typeControl.value === "number" || typeControl.value === "date" || typeControl.value === "time"
+      ? typeControl.value
+      : ""
 
   function updateFieldType() {
     const selectedType = typeControl.value
     const rangeKind = (type) => ["text", "textarea", "email", "phone"].includes(type)
       ? "length"
       : type === "number" ? "number" : type === "date" ? "date" : ""
-    const patternSupported = !["boolean", "radio", "select"].includes(selectedType)
+    const selectedRangeKind = rangeKind(selectedType) || (selectedType === "time" ? "time" : "")
+    const patternSupported = ["text", "textarea", "email", "phone"].includes(selectedType)
     const optionsSupported = ["radio", "select"].includes(selectedType)
     optionsField.hidden = !["radio", "select"].includes(selectedType)
     const minControl = card.querySelector('[data-property="min"]')
     const maxControl = card.querySelector('[data-property="max"]')
-    const patternControl = card.querySelector('[data-property="pattern"]')
     const optionsControl = card.querySelector('[data-property="options"]')
-    minControl.disabled = !rangeKind(selectedType)
-    maxControl.disabled = !rangeKind(selectedType)
+    const stepControl = card.querySelector('[data-property="step"]')
+    const rangeSupported = Boolean(selectedRangeKind)
+    card.querySelector('[data-restriction="range"]').hidden = !rangeSupported
+    card.querySelector('[data-restriction="step"]').hidden = selectedType !== "number"
+    card.querySelector('[data-restriction="pattern-preset"]').hidden = !patternSupported
+    patternAdvanced.hidden = !patternSupported
+    card.querySelector('[data-restriction="pattern-message"]').hidden = !patternSupported || !patternControl.value
+    minControl.disabled = !rangeSupported
+    maxControl.disabled = !rangeSupported
+    stepControl.disabled = selectedType !== "number"
     patternControl.disabled = !patternSupported
-    if (rangeKind(previousType) !== rangeKind(selectedType)) {
+    patternMessageControl.disabled = !patternSupported || !patternControl.value
+    if (previousRangeKind !== selectedRangeKind) {
       minControl.value = ""
       maxControl.value = ""
     }
+    if (selectedType !== "number") stepControl.value = ""
     if (!patternSupported) patternControl.value = ""
+    if (!patternSupported || !patternControl.value) patternMessageControl.value = ""
+    if (!patternSupported) patternPresetControl.value = "none"
     if (!optionsSupported) optionsControl.value = ""
-    previousType = selectedType
+    const rangeLabels = {
+      length: ["Longitud mínima (opcional)", "Longitud máxima (opcional)", "Número entero de caracteres"],
+      number: ["Valor mínimo (opcional)", "Valor máximo (opcional)", "Ej.: 0"],
+      date: ["Fecha desde (opcional)", "Fecha hasta (opcional)", "Selecciona la fecha mínima o máxima"],
+      time: ["Hora desde (opcional)", "Hora hasta (opcional)", "Selecciona la hora mínima o máxima"],
+    }
+    if (rangeSupported) {
+      const [minLabel, maxLabel, placeholder] = rangeLabels[selectedRangeKind]
+      card.querySelector('[data-label-for="min"]').textContent = minLabel
+      card.querySelector('[data-label-for="max"]').textContent = maxLabel
+      minControl.type = ["date", "time"].includes(selectedRangeKind) ? selectedRangeKind : "number"
+      maxControl.type = ["date", "time"].includes(selectedRangeKind) ? selectedRangeKind : "number"
+      minControl.step = selectedRangeKind === "length" || selectedRangeKind === "number" ? "any" : ""
+      maxControl.step = selectedRangeKind === "length" || selectedRangeKind === "number" ? "any" : ""
+      minControl.placeholder = placeholder
+      maxControl.placeholder = placeholder
+      card.querySelector('[data-hint-for="min"]').textContent = selectedRangeKind === "date"
+        ? "La fecha introducida y las posteriores serán válidas."
+        : selectedRangeKind === "time"
+          ? "La hora introducida y las posteriores serán válidas."
+          : selectedRangeKind === "length"
+            ? "Debe ser un entero igual o mayor que cero."
+            : "El valor introducido y los superiores serán válidos."
+      card.querySelector('[data-hint-for="max"]').textContent = selectedRangeKind === "date"
+        ? "La fecha introducida y las anteriores serán válidas."
+        : selectedRangeKind === "time"
+          ? "La hora introducida y las anteriores serán válidas."
+          : selectedRangeKind === "length"
+            ? "Debe ser un entero igual o mayor que cero."
+            : "El valor introducido y los inferiores serán válidos."
+    } else {
+      minControl.value = ""
+      maxControl.value = ""
+      minControl.type = "number"
+      maxControl.type = "number"
+    }
+    card.querySelector('[data-hint-for="defaultValue"]').textContent = selectedType === "boolean"
+      ? 'Escribe "true" o "false"; una casilla obligatoria debe ser true.'
+      : ["radio", "select"].includes(selectedType)
+        ? "Debe coincidir con una de las opciones fijas."
+        : "Se comprobará también frente a las restricciones del campo."
+    const typeHints = {
+      text: "Configura longitud y, si quieres, elige una regla de texto sencilla.",
+      textarea: "Configura longitud y, si quieres, elige una regla de texto sencilla.",
+      email: "El correo ya comprueba automáticamente su formato; también puedes limitar su longitud.",
+      phone: "Configura longitud y una regla sencilla o avanzada si hace falta.",
+      number: "Usa mínimo, máximo e incremento; para números no hace falta una expresión regular.",
+      date: "Usa las fechas Desde/Hasta; el selector ya garantiza una fecha válida.",
+      time: "Usa las horas Desde/Hasta; no hace falta escribir una expresión regular.",
+      boolean: "Se guarda como una casilla true/false.",
+      radio: "Añade las opciones permitidas más abajo.",
+      select: "Añade las opciones permitidas más abajo.",
+    }
+    card.querySelector('[data-hint-for="type"]').textContent = typeHints[selectedType]
+    previousRangeKind = selectedRangeKind
     title.textContent = card.querySelector('[data-property="label"]').value.trim() || "Campo nuevo"
   }
 
   typeControl.addEventListener("change", updateFieldType)
+  patternPresetControl.addEventListener("change", () => {
+    const preset = PATTERN_PRESETS[patternPresetControl.value]
+    if (preset) {
+      patternControl.value = preset.pattern
+      patternMessageControl.value = preset.message
+    } else {
+      patternAdvanced.open = true
+      patternControl.focus()
+      if (!patternControl.value) patternMessageControl.value = ""
+    }
+    updateFieldType()
+  })
+  patternControl.addEventListener("input", () => {
+    const matched = Object.entries(PATTERN_PRESETS)
+      .find(([, preset]) => preset.pattern === patternControl.value)
+    patternPresetControl.value = matched ? matched[0] : patternControl.value ? "custom" : "none"
+    updateFieldType()
+  })
   card.querySelector('[data-property="label"]').addEventListener("input", updateFieldType)
   card.querySelector(".remove-field").addEventListener("click", () => card.remove())
   fieldsList.append(card)

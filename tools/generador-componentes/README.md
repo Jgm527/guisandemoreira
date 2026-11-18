@@ -90,9 +90,20 @@ proyecto, y solo se permiten las operaciones que el módulo real de cada recurso
 exporta. Si la carpeta de salida ya existe, se solicita confirmación explícita
 y se reemplaza solo esa carpeta.
 
-Las expresiones regulares admiten tanto el patrón sin delimitadores como la
-notación JavaScript `/.../flags`. Se comprueban al guardar desde el formulario y
-en el modelo Mongoose para campos de texto, número y fecha.
+Las restricciones del paso de campos cambian según el tipo: longitud para
+texto, texto largo, correo y teléfono; mínimo y máximo para números, fechas y
+horas; e incremento opcional para números. Los campos de radio y selector
+admiten opciones fijas, y los booleanos permiten exigir la casilla y definir su
+valor inicial. El valor inicial también se comprueba frente a las restricciones.
+
+Para texto, texto largo y teléfono puedes elegir reglas habituales (solo
+letras, solo dígitos, letras y números, mayúsculas o minúsculas) sin escribir
+una expresión regular. El correo comprueba su formato automáticamente. Las
+reglas manuales quedan en una sección avanzada; aceptan el patrón
+`^[A-Z]{3}$` o la notación JavaScript `/^[A-Z]{3}$/`, con un mensaje de error
+personalizable. Se comprueban en el formulario y en el modelo Mongoose. Para
+números, fechas y horas se usan sus límites e incrementos específicos, no
+expresiones regulares.
 
 No se modifican archivos del proyecto ni se ejecuta código generado. Las salidas
 se guardan en `tools/generador-componentes/salidas/`, que está excluida de Git.

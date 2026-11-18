@@ -232,18 +232,20 @@ Tipos iniciales que debe poder describir:
 En el formulario inicial se podrán configurar las restricciones aplicables a
 cada campo. Como mínimo:
 
-- texto y texto largo: longitud mínima y máxima, expresión regular y mensaje de
-  validación;
-- número: valor mínimo y máximo;
-- fecha: fecha mínima y máxima;
-- email: formato de email y, cuando corresponda, longitud mínima y máxima;
-- selectores, radio y booleanos: opciones o valores permitidos.
+- texto, texto largo y teléfono: longitud mínima y máxima, reglas sencillas de
+  formato y, opcionalmente, expresión regular avanzada con mensaje;
+- email: formato automático y longitud mínima y máxima;
+- número: valor mínimo y máximo, e incremento opcional;
+- fecha y hora: valor mínimo y máximo;
+- selectores y radio: opciones fijas y valor inicial permitido;
+- booleanos: valor inicial true/false y posibilidad de exigir la casilla activa.
 
-Las expresiones regulares pueden escribirse como patrón sin delimitadores o en
-notación JavaScript `/.../flags`. Deben validarse en el formulario generado y
-en el backend para todo tipo de campo al que se apliquen, incluidos número y
-fecha; no se debe depender del atributo HTML `pattern` cuando el control no lo
-admite.
+Las reglas de formato habituales deben poder elegirse sin escribir una
+expresión regular. La configuración avanzada acepta patrones sin delimitadores
+o la notación JavaScript `/.../flags`; solo se aplica a texto, texto largo,
+correo y teléfono. Números, fechas y horas usan las restricciones propias del
+tipo (límites e incremento para números), por lo que no se pide una expresión
+regular para ellos.
 
 El generador aplicará las restricciones compatibles tanto en el formulario como
 en el esquema o las rutas del backend que genere. Si una restricción no se puede
